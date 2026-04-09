@@ -1,7 +1,25 @@
 import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/server'
 import { ImageResponse } from 'takumi-js/response'
+import { initSync, Renderer } from 'takumi-js/wasm'
+// @ts-expect-error wasm module import
+import wasmModule from '@takumi-rs/wasm/takumi_wasm_bg.wasm'
 import { baseUrl } from './lib/Config'
 import { OgCard } from './lib/Og'
+// @ts-expect-error bytes import
+import cmunrmData from '../public/fonts/cmunrm-clean.ttf?bytes'
+// @ts-expect-error bytes import
+import cmunbxData from '../public/fonts/cmunbx-clean.ttf?bytes'
+// @ts-expect-error bytes import
+import cmunslData from '../public/fonts/cmunsl-clean.ttf?bytes'
+
+initSync(wasmModule)
+const renderer = new Renderer({
+  fonts: [
+    { name: 'CMU Serif', data: cmunrmData, weight: 400, style: 'normal' },
+    { name: 'CMU Serif', data: cmunbxData, weight: 700, style: 'normal' },
+    { name: 'CMU Serif', data: cmunslData, weight: 400, style: 'italic' },
+  ],
+})
 
 const handler = createStartHandler(defaultStreamHandler)
 
@@ -34,35 +52,7 @@ export default {
         {
           width: 1200,
           height: 630,
-          fonts: [
-            {
-              name: 'CMU Serif',
-              data: () =>
-                fetch(new URL('/fonts/cmunrm.ttf', url.origin)).then(
-                  (r) => r.arrayBuffer(),
-                ),
-              weight: 400,
-              style: 'normal',
-            },
-            {
-              name: 'CMU Serif',
-              data: () =>
-                fetch(new URL('/fonts/cmunbx.ttf', url.origin)).then(
-                  (r) => r.arrayBuffer(),
-                ),
-              weight: 700,
-              style: 'normal',
-            },
-            {
-              name: 'CMU Serif',
-              data: () =>
-                fetch(new URL('/fonts/cmunsl.ttf', url.origin)).then(
-                  (r) => r.arrayBuffer(),
-                ),
-              weight: 400,
-              style: 'italic',
-            },
-          ],
+          renderer,
           headers: {
             'Cache-Control': 'public, max-age=3600',
           },
@@ -76,7 +66,7 @@ export default {
       }>()
       const urls = rows.results
         .filter((r) => !r.number.includes('#'))
-        .map((r) => `<url><loc>${baseUrl}/tip/${r.number}</loc></url>`)
+        .map((r) => `<url><loc>${baseUrl}/${r.number}</loc></url>`)
         .join('')
       const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
