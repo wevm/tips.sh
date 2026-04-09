@@ -16,6 +16,32 @@ function ghHeaders(token?: string): Record<string, string> {
   return h
 }
 
+async function firstCommitDate(path: string, token?: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/tempoxyz/tempo/commits?path=${encodeURIComponent(path)}&per_page=1&page=1`,
+      { headers: ghHeaders(token) },
+    )
+    if (!res.ok) return ''
+    // GitHub returns newest first by default; get the Link header for last page
+    const link = res.headers.get('link')
+    if (link) {
+      const lastMatch = link.match(/<([^>]+)>;\s*rel="last"/)
+      if (lastMatch) {
+        const lastRes = await fetch(lastMatch[1], { headers: ghHeaders(token) })
+        if (lastRes.ok) {
+          const commits = (await lastRes.json()) as Array<{ commit: { committer: { date: string } } }>
+          if (commits.length > 0) return commits[commits.length - 1].commit.committer.date.slice(0, 10)
+        }
+      }
+    }
+    // Single page — take the last (oldest) commit
+    const commits = (await res.json()) as Array<{ commit: { committer: { date: string } } }>
+    if (commits.length > 0) return commits[commits.length - 1].commit.committer.date.slice(0, 10)
+  } catch {}
+  return ''
+}
+
 async function raw(ref: string, path: string, token?: string): Promise<string> {
   const res = await fetch(`https://raw.githubusercontent.com/tempoxyz/tempo/${ref}/${path}`, {
     headers: ghHeaders(token),
@@ -34,6 +60,7 @@ type TipRow = {
   filename: string
   protocolVersion: string
   prJson: string
+  createdAt: string
 }
 
 /** Attempt sync with KV-based lock. Returns false if already syncing. */
@@ -116,6 +143,7 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
           url: pr.html_url,
           branch: pr.head.ref,
         }),
+        createdAt: '',
       })
     }
 
@@ -140,7 +168,10 @@ async function sync(db: D1Database, token?: string) {
   const [mergedDetails, prTips] = await Promise.all([
     Promise.all(
       tipPaths.map(async (f) => {
-        const content = await raw('main', f.path, token)
+        const [content, createdAt] = await Promise.all([
+          raw('main', f.path, token),
+          firstCommitDate(f.path, token),
+        ])
         const { number, title } = parseTitle(content)
         const pvMatch = content.match(/\*\*Protocol Version\*\*[:\s]*(.+)/i)
         return {
@@ -153,6 +184,7 @@ async function sync(db: D1Database, token?: string) {
           filename: f.path.replace('tips/', ''),
           protocolVersion: pvMatch ? pvMatch[1].trim() : '',
           prJson: '',
+          createdAt,
         } satisfies TipRow
       }),
     ),
@@ -178,7 +210,7 @@ async function sync(db: D1Database, token?: string) {
   ])
 
   const stmt = db.prepare(
-    'INSERT INTO tips (number, title, authors, status, abstract, content, filename, protocol_version, pr_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO tips (number, title, authors, status, abstract, content, filename, protocol_version, pr_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   )
   await db.batch(
     allTips.map((d) =>
@@ -192,6 +224,7 @@ async function sync(db: D1Database, token?: string) {
         d.filename,
         d.protocolVersion,
         d.prJson,
+        d.createdAt,
       ),
     ),
   )

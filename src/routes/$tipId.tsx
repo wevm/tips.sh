@@ -86,6 +86,15 @@ function TipPage() {
             TIP-{tip.number}: {tip.title}
           </h1>
           {tip.authors && <p style={{ fontStyle: 'italic' }}>{tip.authors}</p>}
+          {tip.createdAt && (
+            <p style={{ fontSize: '0.85em', color: 'var(--color-text-muted)' }}>
+              {new Date(tip.createdAt + 'T00:00:00').toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </p>
+          )}
           {tip.protocolVersion && (
             <p>
               Protocol Version: <strong>{tip.protocolVersion}</strong>

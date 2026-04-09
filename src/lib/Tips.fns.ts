@@ -48,7 +48,7 @@ export const get = createServerFn({ method: 'POST' })
       await db()
     )
       .prepare(
-        'SELECT number, title, authors, status, abstract, content, filename, protocol_version, pr_json FROM tips WHERE number = ?',
+        'SELECT number, title, authors, status, abstract, content, filename, protocol_version, pr_json, created_at FROM tips WHERE number = ?',
       )
       .bind(tipId)
       .first<{
@@ -61,6 +61,7 @@ export const get = createServerFn({ method: 'POST' })
         filename: string
         protocol_version: string
         pr_json: string
+        created_at: string
       }>()
     if (!row) throw new Error(`TIP ${tipId} not found`)
     return {
@@ -72,6 +73,7 @@ export const get = createServerFn({ method: 'POST' })
       abstract: row.abstract,
       status: row.status,
       protocolVersion: row.protocol_version,
+      createdAt: row.created_at,
       pr: row.pr_json ? JSON.parse(row.pr_json) : undefined,
     } satisfies Detail
   })

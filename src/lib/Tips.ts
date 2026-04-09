@@ -21,6 +21,7 @@ export type Detail = {
   abstract: string
   status: string
   protocolVersion: string
+  createdAt: string
   pr?: PrInfo | undefined
 }
 
