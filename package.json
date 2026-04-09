@@ -39,6 +39,7 @@
     "remark-rehype": "^11.1.2",
     "shiki": "^4.0.2",
     "tailwindcss": "^4.1.18",
+    "takumi-js": "^1.0.0-rc.16",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0",
     "zod": "^4.3.6"
