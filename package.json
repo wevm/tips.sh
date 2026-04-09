@@ -15,7 +15,7 @@
     "dev": "vite dev --port 3000",
     "gen:types": "wrangler types",
     "postinstall": "npm run gen:types",
-    "prebuild": "node --env-file=.env --import=tsx scripts/gen-robots.ts",
+    "prebuild": "node --env-file=.env.example --import=tsx scripts/gen-robots.ts",
     "preview": "npm run build && vp preview",
     "sync": "node --env-file=.env --import=tsx scripts/sync.ts",
     "test": "vp test run"
