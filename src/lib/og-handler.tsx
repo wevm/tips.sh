@@ -1,5 +1,6 @@
 import { ImageResponse } from 'takumi-js/response'
 import { initSync, Renderer } from 'takumi-js/wasm'
+// @ts-expect-error wasm module import
 import wasmModule from '@takumi-rs/wasm/takumi_wasm_bg.wasm'
 import { OgCard } from './Og'
 // @ts-expect-error bytes import
@@ -12,7 +13,7 @@ import cmunslData from '../../public/fonts/cmunsl-clean.ttf?bytes'
 let renderer: Renderer
 function getRenderer() {
   if (!renderer) {
-    initSync({ module: wasmModule })
+    initSync(wasmModule)
     renderer = new Renderer({
       fonts: [
         { name: 'CMU Serif', data: cmunrmData, weight: 400, style: 'normal' },
