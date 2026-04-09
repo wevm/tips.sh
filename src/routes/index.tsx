@@ -175,7 +175,7 @@ function SearchResults({
       {results.map((r, i) => (
         <Link
           key={r.number}
-          to="/tip/$tipId"
+          to="/$tipId"
           params={{ tipId: r.number }}
           role="option"
           aria-selected={i === activeIndex}
@@ -299,7 +299,7 @@ function TipsIndex() {
           onCommit={() => {
             if (results && activeIndex >= 0 && activeIndex < results.length) {
               navigate({
-                to: '/tip/$tipId',
+                to: '/$tipId',
                 params: { tipId: results[activeIndex].number },
               })
             }
@@ -338,7 +338,7 @@ function TipsIndex() {
                 <tr key={tip.filename}>
                   <td>
                     <Link
-                      to="/tip/$tipId"
+                      to="/$tipId"
                       params={{ tipId: tip.number }}
                       style={{ fontFamily: 'var(--font-serif)' }}
                     >
@@ -347,7 +347,7 @@ function TipsIndex() {
                   </td>
                   <td>
                     <Link
-                      to="/tip/$tipId"
+                      to="/$tipId"
                       params={{ tipId: tip.number }}
                       style={{ textDecoration: 'none', color: 'inherit' }}
                     >

@@ -67,8 +67,8 @@ export const middleware = createMiddleware({ type: 'request' }).server(
     const url = new URL(request.url)
     const pathname = url.pathname
 
-    // /tip/:id.pdf → PDF response
-    const pdfMatch = pathname.match(/^\/tip\/(\d+)\.pdf$/)
+    // /:id.pdf → PDF response
+    const pdfMatch = pathname.match(/^\/(\d+)\.pdf$/)
     if (pdfMatch) {
       try {
         const { env } = await import('cloudflare:workers')
@@ -123,7 +123,7 @@ export const middleware = createMiddleware({ type: 'request' }).server(
       const { env } = await import('cloudflare:workers')
       const db = env.DB
 
-      const tipMatch = pathname.match(/^\/tip\/(\d+)$/)
+      const tipMatch = pathname.match(/^\/(\d+)$/)
       if (tipMatch) {
         const tip = await db
           .prepare('SELECT content FROM tips WHERE number = ?')
