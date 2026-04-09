@@ -12,13 +12,14 @@
 		{
 			"binding": "DB",
 			"database_name": "tips",
-			"database_id": "c2c3e45c-5c0a-4104-a334-fedb5fb5a4da"
+			"database_id": "d8dc0adf-0f58-43c6-aa6c-8cf3e23e5b9b"
 		}
 	],
 	"kv_namespaces": [
 		{
 			"binding": "TIPS_KV",
-			"id": "TIPS_KV_ID"
+			"id": "684575453c814b6b9cc5592ed73ad223",
+			"preview_id": "413764f83a244e0fbdd6abe7cb0d344e"
 		}
 	],
 	"browser": {
@@ -27,5 +28,16 @@
 	},
 	"triggers": {
 		"crons": ["* * * * *"]
-	}
+	},
+	"workers_dev": false,
+	"routes": [
+		{
+			"pattern": "tips.sh",
+			"zone_name": "tips.sh"
+		},
+		{
+			"pattern": "tips.sh/*",
+			"zone_name": "tips.sh"
+		}
+	]
 }
