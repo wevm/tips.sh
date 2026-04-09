@@ -54,20 +54,28 @@ export async function trySync(): Promise<boolean> {
 
 async function fetchPrTips(token?: string): Promise<TipRow[]> {
   try {
-    const res = await fetch(
-      'https://api.github.com/repos/tempoxyz/tempo/pulls?state=open&per_page=50',
-      { headers: ghHeaders(token) },
-    )
-    if (!res.ok) return []
-
-    const prs = (await res.json()) as Array<{
+    // Paginate through all open PRs
+    const allPrs: Array<{
       number: number
       title: string
       html_url: string
       head: { ref: string }
-    }>
+    }> = []
+    let page = 1
+    while (true) {
+      const res = await fetch(
+        `https://api.github.com/repos/tempoxyz/tempo/pulls?state=open&per_page=100&page=${page}`,
+        { headers: ghHeaders(token) },
+      )
+      if (!res.ok) break
+      const prs = (await res.json()) as typeof allPrs
+      if (prs.length === 0) break
+      allPrs.push(...prs)
+      if (prs.length < 100) break
+      page++
+    }
 
-    const tipPrs = prs.filter((pr) => /tip/i.test(pr.title) && /tip[-/]\d+/i.test(pr.head.ref))
+    const tipPrs = allPrs.filter((pr) => /tip/i.test(pr.title) && /tip[-/]\d+/i.test(pr.head.ref))
 
     const results: TipRow[] = []
 
