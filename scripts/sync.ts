@@ -10,10 +10,9 @@ const ghHeaders: Record<string, string> = {
 if (token) ghHeaders.Authorization = `Bearer ${token}`
 
 async function raw(ref: string, path: string): Promise<string> {
-  const res = await fetch(
-    `https://raw.githubusercontent.com/tempoxyz/tempo/${ref}/${path}`,
-    { headers: ghHeaders },
-  )
+  const res = await fetch(`https://raw.githubusercontent.com/tempoxyz/tempo/${ref}/${path}`, {
+    headers: ghHeaders,
+  })
   if (!res.ok) throw new Error(`Failed to fetch ${path}: ${res.status}`)
   return res.text()
 }
@@ -35,15 +34,19 @@ async function fetchPrTips(): Promise<TipRow[]> {
     'https://api.github.com/repos/tempoxyz/tempo/pulls?state=open&per_page=50',
     { headers: ghHeaders },
   )
-  if (!res.ok) { console.warn('PR API failed:', res.status); return [] }
+  if (!res.ok) {
+    console.warn('PR API failed:', res.status)
+    return []
+  }
 
   const prs = (await res.json()) as Array<{
-    number: number; title: string; html_url: string; head: { ref: string }
+    number: number
+    title: string
+    html_url: string
+    head: { ref: string }
   }>
 
-  const tipPrs = prs.filter(
-    (pr) => /tip/i.test(pr.title) && /tip[-/]\d+/i.test(pr.head.ref),
-  )
+  const tipPrs = prs.filter((pr) => /tip/i.test(pr.title) && /tip[-/]\d+/i.test(pr.head.ref))
   console.log(`Found ${tipPrs.length} TIP PRs`)
 
   const results: TipRow[] = []
@@ -55,7 +58,9 @@ async function fetchPrTips(): Promise<TipRow[]> {
     if (!filesRes.ok) continue
     const files = (await filesRes.json()) as Array<{ filename: string; status: string }>
     const tipFile = files.find(
-      (f) => f.filename.startsWith('tips/tip-') && f.filename.endsWith('.md') &&
+      (f) =>
+        f.filename.startsWith('tips/tip-') &&
+        f.filename.endsWith('.md') &&
         (f.status === 'added' || f.status === 'modified'),
     )
     if (!tipFile) continue
@@ -64,7 +69,8 @@ async function fetchPrTips(): Promise<TipRow[]> {
     const { number, title } = parseTitle(content)
     const pvMatch = content.match(/\*\*Protocol Version\*\*[:\s]*(.+)/i)
     results.push({
-      number, title,
+      number,
+      title,
       authors: parseAuthors(content),
       status: parseStatus(content),
       abstract: parseAbstract(content),
@@ -87,9 +93,7 @@ async function main() {
   if (!treeRes.ok) throw new Error(`GitHub API error: ${treeRes.status}`)
 
   const tree = (await treeRes.json()) as { tree: Array<{ path: string; type: string }> }
-  const tipPaths = tree.tree.filter(
-    (f) => f.type === 'blob' && /^tips\/tip-\d+\.md$/.test(f.path),
-  )
+  const tipPaths = tree.tree.filter((f) => f.type === 'blob' && /^tips\/tip-\d+\.md$/.test(f.path))
   console.log(`Found ${tipPaths.length} merged TIPs`)
 
   const [mergedDetails, prTips] = await Promise.all([
@@ -100,7 +104,8 @@ async function main() {
         const pvMatch = content.match(/\*\*Protocol Version\*\*[:\s]*(.+)/i)
         console.log(`  TIP-${number}: "${title}"`)
         return {
-          number, title,
+          number,
+          title,
           authors: parseAuthors(content),
           status: parseStatus(content),
           abstract: parseAbstract(content),
@@ -121,7 +126,9 @@ async function main() {
     return { ...d, number: `${d.number}#${count}` }
   })
   const allTips = [...mergedDetails, ...prTipsResolved]
-  console.log(`\nTotal: ${allTips.length} TIPs (${mergedDetails.length} merged + ${prTipsResolved.length} PR)`)
+  console.log(
+    `\nTotal: ${allTips.length} TIPs (${mergedDetails.length} merged + ${prTipsResolved.length} PR)`,
+  )
 
   // Write SQL for wrangler d1 execute
   const sqlStatements: string[] = [
@@ -135,7 +142,7 @@ async function main() {
   for (const d of allTips) {
     const esc = (s: string) => s.replace(/'/g, "''")
     sqlStatements.push(
-      `INSERT INTO tips (number, title, authors, status, abstract, content, filename, protocol_version, pr_json) VALUES ('${esc(d.number)}', '${esc(d.title)}', '${esc(d.authors)}', '${esc(d.status)}', '${esc(d.abstract)}', '${esc(d.content)}', '${esc(d.filename)}', '${esc(d.protocolVersion)}', '${esc(d.prJson)}');`
+      `INSERT INTO tips (number, title, authors, status, abstract, content, filename, protocol_version, pr_json) VALUES ('${esc(d.number)}', '${esc(d.title)}', '${esc(d.authors)}', '${esc(d.status)}', '${esc(d.abstract)}', '${esc(d.content)}', '${esc(d.filename)}', '${esc(d.protocolVersion)}', '${esc(d.prJson)}');`,
     )
   }
 
@@ -163,4 +170,7 @@ async function main() {
   console.log('\n✅ Sync complete!')
 }
 
-main().catch((e) => { console.error('❌ Sync failed:', e); process.exit(1) })
+main().catch((e) => {
+  console.error('❌ Sync failed:', e)
+  process.exit(1)
+})

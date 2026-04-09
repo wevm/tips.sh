@@ -23,7 +23,14 @@ export const query = createServerFn({ method: 'POST' })
         .first<{ number: string; title: string; authors: string; status: string }>()
       if (row)
         return [
-          { number: row.number, title: row.title, authors: row.authors, status: row.status, snippet: '', rank: 0 },
+          {
+            number: row.number,
+            title: row.title,
+            authors: row.authors,
+            status: row.status,
+            snippet: '',
+            rank: 0,
+          },
         ] as Result[]
     }
 

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, type Plugin } from 'vite-plus'
 import { devtools } from '@tanstack/devtools-vite'
 import tsconfigPaths from 'vite-tsconfig-paths'
 
@@ -11,6 +11,10 @@ import tailwindcss from '@tailwindcss/vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 
 const config = defineConfig({
+  fmt: {
+    semi: false,
+    singleQuote: true,
+  },
   plugins: [
     bytesImport(),
     devtools(),
@@ -32,9 +36,7 @@ function bytesImport(): Plugin {
     resolveId(id, importer) {
       if (!id.endsWith('?bytes')) return
       const filePath = id.slice(0, -6)
-      const resolved = importer
-        ? resolve(dirname(importer), filePath)
-        : resolve(filePath)
+      const resolved = importer ? resolve(dirname(importer), filePath) : resolve(filePath)
       return '\0bytes:' + resolved
     },
     load(id) {

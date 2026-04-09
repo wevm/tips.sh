@@ -49,8 +49,8 @@ function rehypeShiki() {
         return
 
       const codeEl = node.children[0] as Element
-      const className = ((codeEl.properties?.className as string[]) ?? []).find(
-        (c) => c.startsWith('language-'),
+      const className = ((codeEl.properties?.className as string[]) ?? []).find((c) =>
+        c.startsWith('language-'),
       )
       const lang = className?.replace('language-', '') ?? 'text'
       const code = (codeEl.children[0] as Text)?.value ?? ''

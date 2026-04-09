@@ -41,13 +41,7 @@ export const Route = createFileRoute('/')({
   component: TipsIndex,
 })
 
-function TipNumber({
-  value,
-  prUrl,
-}: {
-  value: string
-  prUrl?: string
-}) {
+function TipNumber({ value, prUrl }: { value: string; prUrl?: string }) {
   const hashIdx = value.indexOf('#')
   if (hashIdx === -1) return <>{value}</>
   const base = value.slice(0, hashIdx)
@@ -68,7 +62,9 @@ function TipNumber({
           </sup>
         </a>
       ) : (
-        <sup style={{ fontSize: '0.7em', color: 'var(--color-text-muted)', textDecoration: 'none' }}>
+        <sup
+          style={{ fontSize: '0.7em', color: 'var(--color-text-muted)', textDecoration: 'none' }}
+        >
           {sup}
         </sup>
       )}
@@ -156,19 +152,9 @@ function SearchBox({
   )
 }
 
-function SearchResults({
-  results,
-  activeIndex,
-}: {
-  results: Result[]
-  activeIndex: number
-}) {
+function SearchResults({ results, activeIndex }: { results: Result[]; activeIndex: number }) {
   if (results.length === 0)
-    return (
-      <p style={{ color: 'var(--color-text-muted)', marginTop: '1.5em' }}>
-        No results found.
-      </p>
-    )
+    return <p style={{ color: 'var(--color-text-muted)', marginTop: '1.5em' }}>No results found.</p>
 
   return (
     <div style={{ marginTop: '1em' }} role="listbox">
@@ -180,8 +166,7 @@ function SearchResults({
           role="option"
           aria-selected={i === activeIndex}
           ref={(el) => {
-            if (i === activeIndex && el)
-              el.scrollIntoView({ block: 'nearest' })
+            if (i === activeIndex && el) el.scrollIntoView({ block: 'nearest' })
           }}
           style={{
             display: 'block',
@@ -189,8 +174,7 @@ function SearchResults({
             color: 'inherit',
             padding: '0.8em 0.4em',
             borderBottom: '0.5px solid var(--color-rule-light)',
-            background:
-              i === activeIndex ? 'var(--color-code-bg)' : 'transparent',
+            background: i === activeIndex ? 'var(--color-code-bg)' : 'transparent',
             borderRadius: i === activeIndex ? '3px' : undefined,
           }}
         >
@@ -210,7 +194,8 @@ function SearchResults({
                 flexShrink: 0,
               }}
             >
-              TIP-<TipNumber value={r.number} />
+              TIP-
+              <TipNumber value={r.number} />
             </span>
             <span style={{ fontWeight: 700 }}>{r.title}</span>
             <span style={{ marginLeft: 'auto', flexShrink: 0 }}>
@@ -237,10 +222,7 @@ function SearchResults({
 
 function TipsIndex() {
   const tips = Route.useLoaderData()
-  const [query, setQuery] = useQueryState(
-    'q',
-    parseAsString.withDefault(''),
-  )
+  const [query, setQuery] = useQueryState('q', parseAsString.withDefault(''))
   const [results, setResults] = useState<Result[] | null>(null)
   const [searching, setSearching] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -279,8 +261,8 @@ function TipsIndex() {
       <div className="tip-frontmatter">
         <h1>Tempo Improvement Proposals</h1>
         <p>
-          A collection of specifications defining protocol changes and
-          enhancements to the Tempo blockchain.
+          A collection of specifications defining protocol changes and enhancements to the Tempo
+          blockchain.
         </p>
       </div>
 
@@ -291,8 +273,7 @@ function TipsIndex() {
           onArrow={(dir) => {
             if (!results?.length) return
             setActiveIndex((prev) => {
-              if (dir === 'down')
-                return prev < results.length - 1 ? prev + 1 : 0
+              if (dir === 'down') return prev < results.length - 1 ? prev + 1 : 0
               return prev > 0 ? prev - 1 : results.length - 1
             })
           }}
@@ -317,15 +298,11 @@ function TipsIndex() {
               Searching…
             </p>
           ) : (
-            results && (
-              <SearchResults results={results} activeIndex={activeIndex} />
-            )
+            results && <SearchResults results={results} activeIndex={activeIndex} />
           )
         ) : (
           <table style={{ marginTop: '0.5em' }}>
-            <caption className="sr-only">
-              List of Tempo Improvement Proposals
-            </caption>
+            <caption className="sr-only">List of Tempo Improvement Proposals</caption>
             <thead>
               <tr>
                 <th style={{ width: '5rem' }}>Number</th>

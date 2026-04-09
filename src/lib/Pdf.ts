@@ -2,8 +2,7 @@
 
 import * as fonts from './Pdf.fonts'
 
-const katexCdn =
-  'https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css'
+const katexCdn = 'https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css'
 
 const printCss = `
   @page { size: A4; margin: 18mm 16mm 20mm; }
@@ -71,10 +70,7 @@ export async function render(options: Pdf.Options): Promise<Uint8Array> {
   const html = buildDocument(options)
 
   // Check KV cache
-  const hashBuffer = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(html),
-  )
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(html))
   const hashHex = [...new Uint8Array(hashBuffer)]
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
@@ -88,9 +84,7 @@ export async function render(options: Pdf.Options): Promise<Uint8Array> {
       'BROWSER binding not available (Browser Rendering requires deployed Cloudflare Workers)',
     )
 
-  const puppeteer = (await import(
-    /* @vite-ignore */ '@cloudflare/puppeteer'
-  )).default
+  const puppeteer = (await import(/* @vite-ignore */ '@cloudflare/puppeteer')).default
   const browser = await puppeteer.launch(env.BROWSER)
   try {
     const page = await browser.newPage()

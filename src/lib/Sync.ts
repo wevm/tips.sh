@@ -1,11 +1,6 @@
 /** GitHub → D1 sync for TIPs. KV is only used for the sync lock. */
 
-import {
-  parseTitle,
-  parseStatus,
-  parseAbstract,
-  parseAuthors,
-} from './Tips'
+import { parseTitle, parseStatus, parseAbstract, parseAuthors } from './Tips'
 
 async function getEnv() {
   const { env } = await import('cloudflare:workers')
@@ -21,15 +16,10 @@ function ghHeaders(token?: string): Record<string, string> {
   return h
 }
 
-async function raw(
-  ref: string,
-  path: string,
-  token?: string,
-): Promise<string> {
-  const res = await fetch(
-    `https://raw.githubusercontent.com/tempoxyz/tempo/${ref}/${path}`,
-    { headers: ghHeaders(token) },
-  )
+async function raw(ref: string, path: string, token?: string): Promise<string> {
+  const res = await fetch(`https://raw.githubusercontent.com/tempoxyz/tempo/${ref}/${path}`, {
+    headers: ghHeaders(token),
+  })
   if (!res.ok) throw new Error(`Failed to fetch ${path}: ${res.status}`)
   return res.text()
 }
@@ -54,8 +44,7 @@ export async function trySync(): Promise<boolean> {
   if (lock) return false
   await kv.put('tips:syncing', '1', { expirationTtl: 120 })
   try {
-    const token = (env as unknown as Record<string, unknown>)
-      .GITHUB_TOKEN as string | undefined
+    const token = (env as unknown as Record<string, unknown>).GITHUB_TOKEN as string | undefined
     await sync(env.DB, token)
   } finally {
     await kv.delete('tips:syncing')
@@ -78,9 +67,7 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
       head: { ref: string }
     }>
 
-    const tipPrs = prs.filter(
-      (pr) => /tip/i.test(pr.title) && /tip[-/]\d+/i.test(pr.head.ref),
-    )
+    const tipPrs = prs.filter((pr) => /tip/i.test(pr.title) && /tip[-/]\d+/i.test(pr.head.ref))
 
     const results: TipRow[] = []
 
@@ -140,9 +127,7 @@ async function sync(db: D1Database, token?: string) {
   const tree = (await treeRes.json()) as {
     tree: Array<{ path: string; type: string }>
   }
-  const tipPaths = tree.tree.filter(
-    (f) => f.type === 'blob' && /^tips\/tip-\d+\.md$/.test(f.path),
-  )
+  const tipPaths = tree.tree.filter((f) => f.type === 'blob' && /^tips\/tip-\d+\.md$/.test(f.path))
 
   const [mergedDetails, prTips] = await Promise.all([
     Promise.all(

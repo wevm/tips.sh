@@ -17,3 +17,4 @@ todos.json
 !.env.example
 .env
 public/robots.txt
+worker-configuration.d.ts

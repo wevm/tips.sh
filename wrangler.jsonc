@@ -1,43 +1,43 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "tips",
-	"compatibility_date": "2025-09-02",
-	"compatibility_flags": ["nodejs_compat"],
-	"main": "src/worker.tsx",
-	"observability": {
-		"enabled": true
-	},
-	"upload_source_maps": true,
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "tips",
-			"database_id": "d8dc0adf-0f58-43c6-aa6c-8cf3e23e5b9b"
-		}
-	],
-	"kv_namespaces": [
-		{
-			"binding": "TIPS_KV",
-			"id": "684575453c814b6b9cc5592ed73ad223",
-			"preview_id": "413764f83a244e0fbdd6abe7cb0d344e"
-		}
-	],
-	"browser": {
-		"binding": "BROWSER",
-		"remote": true
-	},
-	"triggers": {
-		"crons": ["* * * * *"]
-	},
-	"workers_dev": false,
-	"routes": [
-		{
-			"pattern": "tips.sh",
-			"zone_name": "tips.sh"
-		},
-		{
-			"pattern": "tips.sh/*",
-			"zone_name": "tips.sh"
-		}
-	]
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tips",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/worker.tsx",
+  "observability": {
+    "enabled": true,
+  },
+  "upload_source_maps": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tips",
+      "database_id": "d8dc0adf-0f58-43c6-aa6c-8cf3e23e5b9b",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "TIPS_KV",
+      "id": "684575453c814b6b9cc5592ed73ad223",
+      "preview_id": "413764f83a244e0fbdd6abe7cb0d344e",
+    },
+  ],
+  "browser": {
+    "binding": "BROWSER",
+    "remote": true,
+  },
+  "triggers": {
+    "crons": ["* * * * *"],
+  },
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "tips.sh",
+      "zone_name": "tips.sh",
+    },
+    {
+      "pattern": "tips.sh/*",
+      "zone_name": "tips.sh",
+    },
+  ],
 }

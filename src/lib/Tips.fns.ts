@@ -11,7 +11,9 @@ async function db() {
 
 /** List all TIPs ordered by number. */
 export const list = createServerFn().handler(async () => {
-  const rows = await (await db())
+  const rows = await (
+    await db()
+  )
     .prepare(
       'SELECT number, title, authors, status, abstract, filename, pr_json FROM tips ORDER BY CAST(number AS INTEGER)',
     )
@@ -42,7 +44,9 @@ export const list = createServerFn().handler(async () => {
 export const get = createServerFn({ method: 'POST' })
   .inputValidator(z.string())
   .handler(async ({ data: tipId }) => {
-    const row = await (await db())
+    const row = await (
+      await db()
+    )
       .prepare(
         'SELECT number, title, authors, status, abstract, content, filename, protocol_version, pr_json FROM tips WHERE number = ?',
       )

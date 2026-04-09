@@ -137,16 +137,12 @@ export const middleware = createMiddleware({ type: 'request' }).server(
 
       if (pathname === '/') {
         const rows = await db
-          .prepare(
-            'SELECT number, title, status FROM tips ORDER BY CAST(number AS INTEGER)',
-          )
+          .prepare('SELECT number, title, status FROM tips ORDER BY CAST(number AS INTEGER)')
           .all<{ number: string; title: string; status: string }>()
         if (rows.results.length > 0) {
           const lines = [
             '# Tempo Improvement Proposals\n',
-            ...rows.results.map(
-              (t) => `- **TIP-${t.number}**: ${t.title} (${t.status})`,
-            ),
+            ...rows.results.map((t) => `- **TIP-${t.number}**: ${t.title} (${t.status})`),
           ]
           throw new Response(lines.join('\n'), {
             headers: { 'Content-Type': 'text/markdown; charset=utf-8' },

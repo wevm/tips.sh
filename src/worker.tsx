@@ -31,24 +31,17 @@ export default {
     const ogMatch = url.pathname.match(/^\/og\/(.+)\.png$/)
     if (ogMatch) {
       const tipNumber = ogMatch[1]
-      const row = await env.DB.prepare(
-        'SELECT number, title, authors FROM tips WHERE number = ?',
-      )
+      const row = await env.DB.prepare('SELECT number, title, authors FROM tips WHERE number = ?')
         .bind(tipNumber)
         .first<{
           number: string
           title: string
           authors: string
         }>()
-      if (!row)
-        return new Response('Not found', { status: 404 })
+      if (!row) return new Response('Not found', { status: 404 })
 
       return new ImageResponse(
-        <OgCard
-          number={row.number}
-          title={row.title}
-          authors={row.authors}
-        />,
+        <OgCard number={row.number} title={row.title} authors={row.authors} />,
         {
           width: 1200,
           height: 630,
@@ -84,11 +77,7 @@ export default {
     return handler(request)
   },
 
-  async scheduled(
-    _controller: ScheduledController,
-    _env: Env,
-    ctx: ExecutionContext,
-  ) {
+  async scheduled(_controller: ScheduledController, _env: Env, ctx: ExecutionContext) {
     const { trySync } = await import('./lib/Sync')
     ctx.waitUntil(trySync())
   },

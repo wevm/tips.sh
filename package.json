@@ -6,13 +6,15 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3000",
-    "prebuild": "node --env-file=.env --import=tsx scripts/gen-robots.ts",
-    "build": "vite build",
-    "preview": "npm run build && vite preview",
-    "test": "vitest run",
+    "build": "vp build",
+    "check": "vp check --fix",
     "deploy": "npm run build && wrangler deploy",
-    "cf-typegen": "wrangler types"
+    "dev": "vp dev --port 3000",
+    "gen:types": "wrangler types",
+    "postinstall": "npm run gen:types",
+    "prebuild": "node --env-file=.env --import=tsx scripts/gen-robots.ts",
+    "preview": "npm run build && vp preview",
+    "test": "vp test run"
   },
   "dependencies": {
     "@cloudflare/puppeteer": "^1.0.6",
@@ -54,9 +56,12 @@
     "@vitejs/plugin-react": "^5.0.4",
     "jsdom": "^27.0.0",
     "typescript": "^5.7.2",
-    "vite": "^7.1.7",
+    "vite-plus": "^0.1.16",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.0.5",
     "wrangler": "^4.81.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
   }
 }

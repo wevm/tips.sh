@@ -1,32 +1,32 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* ── LaTeX Article Theme for TIP Explorer ── */
 
 /* ── Computer Modern Unicode (CMU) Serif — the LaTeX font ── */
 @font-face {
-  font-family: "CMU Serif";
-  src: url("/fonts/cmunrm.ttf") format("truetype");
+  font-family: 'CMU Serif';
+  src: url('/fonts/cmunrm.ttf') format('truetype');
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
-  font-family: "CMU Serif";
-  src: url("/fonts/cmunsl.ttf") format("truetype");
+  font-family: 'CMU Serif';
+  src: url('/fonts/cmunsl.ttf') format('truetype');
   font-style: italic;
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
-  font-family: "CMU Serif";
-  src: url("/fonts/cmunbx.ttf") format("truetype");
+  font-family: 'CMU Serif';
+  src: url('/fonts/cmunbx.ttf') format('truetype');
   font-style: normal;
   font-weight: 700;
   font-display: swap;
 }
 @font-face {
-  font-family: "CMU Serif";
-  src: url("/fonts/cmunbl.ttf") format("truetype");
+  font-family: 'CMU Serif';
+  src: url('/fonts/cmunbl.ttf') format('truetype');
   font-style: italic;
   font-weight: 700;
   font-display: swap;
@@ -34,9 +34,9 @@
 
 /* ── Custom Properties ── */
 :root {
-  --font-serif: "CMU Serif", "Computer Modern", Georgia, "Times New Roman", serif;
-  --font-mono: "JetBrains Mono", "CMU Typewriter Text", "Latin Modern Mono",
-    "Courier New", monospace;
+  --font-serif: 'CMU Serif', 'Computer Modern', Georgia, 'Times New Roman', serif;
+  --font-mono:
+    'JetBrains Mono', 'CMU Typewriter Text', 'Latin Modern Mono', 'Courier New', monospace;
 
   --color-bg: #fdfdfd;
   --color-text: #111;
@@ -69,7 +69,12 @@ body {
 }
 
 /* ── Typography ── */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-serif);
   font-weight: 700;
   line-height: 1.3;
@@ -78,10 +83,18 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0.6em;
 }
 
-h1 { font-size: 1.8rem; }
-h2 { font-size: 1.4rem; }
-h3 { font-size: 1.15rem; }
-h4 { font-size: 1.05rem; }
+h1 {
+  font-size: 1.8rem;
+}
+h2 {
+  font-size: 1.4rem;
+}
+h3 {
+  font-size: 1.15rem;
+}
+h4 {
+  font-size: 1.05rem;
+}
 
 p {
   margin: 0 0 1em;
@@ -203,7 +216,7 @@ tbody tr + tr {
 .tip-body ul {
   margin: 1em 0;
   padding-left: 1.4em;
-  list-style-type: "–  ";
+  list-style-type: '–  ';
 }
 
 .tip-body ol {
@@ -212,8 +225,12 @@ tbody tr + tr {
   list-style-type: decimal;
 }
 
-.tip-body ul ul { list-style-type: "–  "; }
-.tip-body ul ul ul { list-style-type: "·  "; }
+.tip-body ul ul {
+  list-style-type: '–  ';
+}
+.tip-body ul ul ul {
+  list-style-type: '·  ';
+}
 
 .tip-body li {
   margin-bottom: 0.3em;
@@ -300,7 +317,7 @@ figcaption {
   color: var(--color-text-muted);
 }
 
-.tip-status-badge[data-status="mainnet"] {
+.tip-status-badge[data-status='mainnet'] {
   font-style: normal;
   font-weight: 600;
   color: var(--color-text);
