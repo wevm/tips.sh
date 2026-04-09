@@ -117,6 +117,25 @@ export const middleware = createMiddleware({ type: 'request' }).server(
       }
     }
 
+    // /:id.md → always serve markdown regardless of user-agent
+    const mdMatch = pathname.match(/^\/(\d+)\.md$/)
+    if (mdMatch) {
+      try {
+        const { env } = await import('cloudflare:workers')
+        const tip = await env.DB.prepare('SELECT content FROM tips WHERE number = ?')
+          .bind(mdMatch[1])
+          .first<{ content: string }>()
+        if (tip)
+          throw new Response(tip.content, {
+            headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+          })
+      } catch (e) {
+        if (e instanceof Response) throw e
+        console.error('[md-router]', e)
+      }
+      return next()
+    }
+
     if (!shouldServeMarkdown(request)) return next()
 
     try {
