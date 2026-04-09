@@ -6,8 +6,6 @@ export type Summary = {
   title: string
   filename: string
   status: string
-  abstract: string
-  authors: string
   pr?: PrInfo | undefined
 }
 
@@ -15,6 +13,7 @@ export type Summary = {
 export type Detail = {
   filename: string
   content: string
+  html: string
   number: string
   title: string
   authors: string

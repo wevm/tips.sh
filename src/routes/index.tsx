@@ -50,17 +50,9 @@ function TipNumber({ value, prUrl }: { value: string; prUrl?: string }) {
     <>
       {base}
       {prUrl ? (
-        <a
-          href={prUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          style={{ textDecoration: 'none' }}
-        >
-          <sup style={{ fontSize: '0.7em', color: 'var(--color-link)', textDecoration: 'none' }}>
-            {sup}
-          </sup>
-        </a>
+        <sup style={{ fontSize: '0.7em', color: 'var(--color-link)', textDecoration: 'none' }}>
+          {sup}
+        </sup>
       ) : (
         <sup
           style={{ fontSize: '0.7em', color: 'var(--color-text-muted)', textDecoration: 'none' }}
@@ -312,7 +304,7 @@ function TipsIndex() {
             </thead>
             <tbody>
               {tips.map((tip) => (
-                <tr key={tip.filename}>
+                <tr key={tip.number}>
                   <td>
                     <Link
                       to="/$tipId"

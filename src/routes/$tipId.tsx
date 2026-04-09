@@ -1,21 +1,12 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import * as Config from '#/lib/Config'
 import * as Tips from '#/lib/Tips.fns'
-import * as Markdown from '#/lib/Markdown'
 
 export const Route = createFileRoute('/$tipId')({
   loader: async ({ params }) => {
     const tipId = params.tipId.replace(/\.md$/, '')
     const tip = await Tips.get({ data: tipId })
-
-    const bodyMarkdown = tip.content
-      .replace(/^---\n[\s\S]*?\n---\n*/, '')
-      .replace(/^# .+\n+/, '')
-      .replace(/^\*\*Protocol Version\*\*.*\n+/, '')
-      .replace(/^---\n+/, '')
-
-    const html = await Markdown.render(bodyMarkdown)
-    return { tip, html }
+    return { tip, html: tip.html }
   },
   head: ({ loaderData }) => {
     const tip = loaderData?.tip
@@ -37,7 +28,13 @@ export const Route = createFileRoute('/$tipId')({
         { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:image', content: tip ? `${Config.baseUrl}/og/${tip.number}.png` : undefined },
       ],
-      links: [{ rel: 'canonical', href: url }],
+      links: [
+        { rel: 'canonical', href: url },
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
+        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap' },
+        { rel: 'stylesheet', href: 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css' },
+      ],
       scripts: tip
         ? [
             {

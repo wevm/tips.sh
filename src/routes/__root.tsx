@@ -32,20 +32,6 @@ export const Route = createRootRoute({
       { title: 'Tempo TIPs' },
     ],
     links: [
-      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-      {
-        rel: 'preconnect',
-        href: 'https://fonts.gstatic.com',
-        crossOrigin: 'anonymous',
-      },
-      {
-        rel: 'stylesheet',
-        href: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap',
-      },
-      {
-        rel: 'stylesheet',
-        href: 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css',
-      },
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
       { rel: 'stylesheet', href: appCss },
     ],
