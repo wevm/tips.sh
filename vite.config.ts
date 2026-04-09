@@ -15,6 +15,7 @@ const config = defineConfig({
     semi: false,
     singleQuote: true,
   },
+
   plugins: [
     bytesImport(),
     devtools(),
