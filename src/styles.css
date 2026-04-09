@@ -216,7 +216,7 @@ tbody tr + tr {
 .tip-body ul {
   margin: 1em 0;
   padding-left: 1.4em;
-  list-style-type: '–  ';
+  list-style-type: '\2013  ';
 }
 
 .tip-body ol {
@@ -226,10 +226,10 @@ tbody tr + tr {
 }
 
 .tip-body ul ul {
-  list-style-type: '–  ';
+  list-style-type: '\2013  ';
 }
 .tip-body ul ul ul {
-  list-style-type: '·  ';
+  list-style-type: '\00B7  ';
 }
 
 .tip-body li {
