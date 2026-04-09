@@ -1,31 +1,60 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { fetchTip } from '#/lib/tips'
-import { renderMarkdown } from '#/lib/markdown'
-import { TipRenderer } from '#/components/TipRenderer'
+import { baseUrl } from '#/lib/Config'
+import * as Tips from '#/lib/Tips.fns'
+import * as Markdown from '#/lib/Markdown'
 
 export const Route = createFileRoute('/tip/$tipId')({
   loader: async ({ params }) => {
-    const tip = await fetchTip({ data: params.tipId })
+    const tip = await Tips.get({ data: params.tipId })
 
-    // Strip the YAML frontmatter and/or title heading before rendering
     const bodyMarkdown = tip.content
-      .replace(/^---\n[\s\S]*?\n---\n*/, '') // strip YAML frontmatter
-      .replace(/^# .+\n+/, '') // strip title heading
-      .replace(/^\*\*Protocol Version\*\*.*\n+/, '') // strip protocol version line
-      .replace(/^---\n+/, '') // strip leading horizontal rule
+      .replace(/^---\n[\s\S]*?\n---\n*/, '')
+      .replace(/^# .+\n+/, '')
+      .replace(/^\*\*Protocol Version\*\*.*\n+/, '')
+      .replace(/^---\n+/, '')
 
-    const html = await renderMarkdown(bodyMarkdown)
+    const html = await Markdown.render(bodyMarkdown)
     return { tip, html }
   },
-  head: ({ loaderData }) => ({
-    meta: [
-      {
-        title: loaderData
-          ? `TIP-${loaderData.tip.number}: ${loaderData.tip.title}`
-          : 'Tempo TIP',
-      },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    const tip = loaderData?.tip
+    const title = tip ? `TIP-${tip.number}: ${tip.title}` : 'Tempo TIP'
+    const description = tip?.abstract?.slice(0, 160) || 'A Tempo Improvement Proposal'
+    const url = tip ? `${baseUrl}/tip/${tip.number}` : baseUrl
+
+    return {
+      meta: [
+        { title },
+        { name: 'description', content: description },
+        { name: 'og:type', content: 'article' },
+        { name: 'og:title', content: title },
+        { name: 'og:description', content: description },
+        { name: 'og:url', content: url },
+        { name: 'twitter:card', content: 'summary' },
+      ],
+      links: [{ rel: 'canonical', href: url }],
+      scripts: tip
+        ? [
+            {
+              type: 'application/ld+json',
+              children: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'TechArticle',
+                headline: title,
+                description,
+                url,
+                author: tip.authors
+                  ? tip.authors.split(',').map((a: string) => ({
+                      '@type': 'Person',
+                      name: a.trim(),
+                    }))
+                  : undefined,
+              }),
+            },
+          ]
+        : [],
+    }
+  },
   component: TipPage,
 })
 
@@ -33,8 +62,8 @@ function TipPage() {
   const { tip, html } = Route.useLoaderData()
 
   return (
-    <div className="tip-article">
-      <nav style={{ marginBottom: '2em' }}>
+    <main className="tip-article">
+      <nav aria-label="Breadcrumb" style={{ marginBottom: '2em' }}>
         <Link
           to="/"
           style={{
@@ -46,43 +75,53 @@ function TipPage() {
         </Link>
       </nav>
 
-      <div className="tip-frontmatter">
-        <h1>
-          TIP-{tip.number}: {tip.title}
-        </h1>
-        {tip.authors && (
-          <p style={{ fontStyle: 'italic' }}>{tip.authors}</p>
-        )}
-        {tip.protocolVersion && (
-          <p>
-            Protocol Version: <strong>{tip.protocolVersion}</strong>
-          </p>
-        )}
-        {tip.pr && (
+      <article>
+        <header className="tip-frontmatter">
+          <h1>
+            TIP-{tip.number}: {tip.title}
+          </h1>
+          {tip.authors && (
+            <p style={{ fontStyle: 'italic' }}>{tip.authors}</p>
+          )}
+          {tip.protocolVersion && (
+            <p>
+              Protocol Version: <strong>{tip.protocolVersion}</strong>
+            </p>
+          )}
+          {tip.pr && (
+            <p style={{ fontSize: '0.85em' }}>
+              Proposed in{' '}
+              <a href={tip.pr.url} target="_blank" rel="noopener noreferrer">
+                PR #{tip.pr.number}
+              </a>
+            </p>
+          )}
           <p style={{ fontSize: '0.85em' }}>
-            Proposed in{' '}
-            <a href={tip.pr.url} target="_blank" rel="noopener noreferrer">
-              PR #{tip.pr.number}
+            <a
+              href={`/tip/${tip.number}.pdf`}
+              style={{ marginRight: '1em' }}
+            >
+              Download PDF
+            </a>
+            <a
+              href={
+                tip.pr
+                  ? `${tip.pr.url}/files`
+                  : `https://github.com/tempoxyz/tempo/blob/main/tips/tip-${tip.number}.md`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View on GitHub
             </a>
           </p>
-        )}
-        <p>
-          <a
-            href={
-              tip.pr
-                ? `${tip.pr.url}/files`
-                : `https://github.com/tempoxyz/tempo/blob/main/tips/tip-${tip.number}.md`
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: '0.85em' }}
-          >
-            View on GitHub
-          </a>
-        </p>
-      </div>
+        </header>
 
-      <TipRenderer html={html} />
-    </div>
+        <div
+          className="tip-body"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </article>
+    </main>
   )
 }

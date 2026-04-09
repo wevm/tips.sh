@@ -1,3 +1,5 @@
+/** Unified pipeline: remark → rehype with Shiki (JS engine) and KaTeX. */
+
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
@@ -47,8 +49,9 @@ function rehypeShiki() {
         return
 
       const codeEl = node.children[0] as Element
-      const className = ((codeEl.properties?.className as string[]) ?? [])
-        .find((c) => c.startsWith('language-'))
+      const className = ((codeEl.properties?.className as string[]) ?? []).find(
+        (c) => c.startsWith('language-'),
+      )
       const lang = className?.replace('language-', '') ?? 'text'
       const code = (codeEl.children[0] as Text)?.value ?? ''
 
@@ -60,7 +63,6 @@ function rehypeShiki() {
         theme: 'github-light',
       })
 
-      // Replace the <pre> node with raw HTML
       if (parent && typeof index === 'number') {
         ;(parent.children as unknown[])[index] = {
           type: 'raw',
@@ -98,64 +100,37 @@ function getTextContent(node: Element): string {
   return text
 }
 
-/**
- * Pre-process markdown to wrap math-like patterns in LaTeX delimiters.
- * - `10^-6` → `$10^{-6}$`
- * - `10^12` → `$10^{12}$`
- * - Escape `$` used for currency so remark-math ignores it
- */
-/**
- * Check if an inline code span is a math formula (not a code identifier).
- * Math formulas contain × or arithmetic on numbers/variables like:
- *   `(code_size × 1,000) + 500,000`
- *   `32,000 + (code_size × 200)`
- *   `code_size × 1,000`
- */
 function isMathExpression(code: string): boolean {
-  // Must contain × to be considered math
   if (!code.includes('×')) return false
-  // Should not contain typical code patterns (parens are fine in math)
   if (/[{};]|==|!=|=>|->|&&|\|\||\./.test(code)) return false
-  // Must have at least one number
   if (!/\d/.test(code)) return false
   return true
 }
 
-/**
- * Convert inline code math to LaTeX notation.
- * `code_size × 1,000` → `\text{code\_size} \times 1{,}000`
- */
 function codeToLatex(code: string): string {
   return code
-    // Wrap word identifiers in \text{} FIRST (before × replacement)
     .replace(/[a-zA-Z_][a-zA-Z0-9_]*/g, (w) => {
       return `\\text{${w.replace(/_/g, '\\_')}}`
     })
-    // Replace × with \times (after identifiers are wrapped)
     .replace(/×/g, ' \\times ')
-    // Format commas in numbers: 1,000 → 1{,}000
     .replace(/(\d),(\d)/g, '$1{,}$2')
 }
 
-function preprocessMath(md: string): string {
+function preprocess(md: string): string {
   return md
-    // Escape currency $ (dollar followed by digit) — but not inside backticks
     .replace(/(^|[^\\`])\$(\d)/gm, (_m, pre, digit) => `${pre}\\$${digit}`)
-    // Convert inline code math expressions: `expr × expr` → $expr \times expr$
     .replace(/`([^`]+)`/g, (_m, code) => {
-      if (isMathExpression(code)) {
-        return `$${codeToLatex(code)}$`
-      }
+      if (isMathExpression(code)) return `$${codeToLatex(code)}$`
       return _m
     })
-    // Convert superscript patterns: 10^-6, 10^12, 10^{-18}
     .replace(/(?<![`$])(\d+)\^(-?\d+)(?![}`])/g, (_, base, exp) => {
       return `$${base}^{${exp}}$`
     })
 }
 
-export async function renderMarkdown(markdown: string): Promise<string> {
-  const processed = preprocessMath(markdown)
+/** Render markdown to HTML. */
+export async function render(markdown: string): Promise<string> {
+  const processed = preprocess(markdown)
 
   const result = await unified()
     .use(remarkParse)

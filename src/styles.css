@@ -8,24 +8,28 @@
   src: url("/fonts/cmunrm.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
+  font-display: swap;
 }
 @font-face {
   font-family: "CMU Serif";
   src: url("/fonts/cmunsl.ttf") format("truetype");
   font-style: italic;
   font-weight: 400;
+  font-display: swap;
 }
 @font-face {
   font-family: "CMU Serif";
   src: url("/fonts/cmunbx.ttf") format("truetype");
   font-style: normal;
   font-weight: 700;
+  font-display: swap;
 }
 @font-face {
   font-family: "CMU Serif";
   src: url("/fonts/cmunbl.ttf") format("truetype");
   font-style: italic;
   font-weight: 700;
+  font-display: swap;
 }
 
 /* ── Custom Properties ── */
@@ -300,4 +304,25 @@ figcaption {
   font-style: normal;
   font-weight: 600;
   color: var(--color-text);
+}
+
+/* ── Search Highlights ── */
+mark {
+  background: #fff3b0;
+  color: inherit;
+  padding: 0.05em 0.1em;
+  border-radius: 2px;
+}
+
+/* ── Visually Hidden (screen readers only) ── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

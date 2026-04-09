@@ -3,6 +3,10 @@
 // Runtime types generated with workerd@1.20260405.1 2025-09-02 nodejs_compat
 declare namespace Cloudflare {
 	interface Env {
+		DB: D1Database
+		TIPS_KV: KVNamespace
+		BROWSER: Fetcher
+		GITHUB_TOKEN?: string
 	}
 }
 interface Env extends Cloudflare.Env {}

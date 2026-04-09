@@ -16,3 +16,4 @@ todos.json
 !.dev.vars.example
 !.env.example
 .env
+public/robots.txt
