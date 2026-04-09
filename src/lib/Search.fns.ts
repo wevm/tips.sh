@@ -43,8 +43,12 @@ export const query = createServerFn({ method: 'POST' })
     const rows = await db
       .prepare(
         `SELECT t.number, t.title, t.authors, t.status,
-                snippet(tips_fts, 4, '<mark>', '</mark>', '…', 32) as snippet,
-                bm25(tips_fts, 10, 6, 3, 2, 1) as rank
+                COALESCE(
+                  NULLIF(snippet(tips_fts, 4, '<mark>', '</mark>', '…', 32), ''),
+                  NULLIF(snippet(tips_fts, 3, '<mark>', '</mark>', '…', 32), ''),
+                  snippet(tips_fts, 1, '<mark>', '</mark>', '…', 32)
+                ) as snippet,
+                bm25(tips_fts, 10, 20, 3, 5, 1) as rank
          FROM tips_fts
          JOIN tips t ON t.rowid = tips_fts.rowid
          WHERE tips_fts MATCH ?
