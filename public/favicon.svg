@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    text { font-family: "Computer Modern", "CMU Serif", Georgia, "Times New Roman", serif; }
+    @media (prefers-color-scheme: light) {
+      text { fill: #111; }
+    }
+    @media (prefers-color-scheme: dark) {
+      text { fill: #f0f0f0; }
+    }
+  </style>
+  <text x="32" y="32" dominant-baseline="central" text-anchor="middle" font-size="56" font-weight="400">T</text>
+</svg>
