@@ -1,7 +1,6 @@
 import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/server'
 import { ImageResponse } from 'takumi-js/response'
 import { initSync, Renderer } from 'takumi-js/wasm'
-// @ts-expect-error wasm module import
 import wasmModule from '@takumi-rs/wasm/takumi_wasm_bg.wasm'
 import * as Config from './lib/Config'
 import { OgCard } from './lib/Og'
