@@ -1,6 +1,5 @@
 import { ImageResponse } from 'takumi-js/response'
 import { initSync, Renderer } from 'takumi-js/wasm'
-// @ts-expect-error wasm module import
 import wasmModule from '@takumi-rs/wasm/takumi_wasm_bg.wasm'
 import { OgCard } from './Og'
 // @ts-expect-error bytes import
