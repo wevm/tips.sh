@@ -1,7 +1,6 @@
 import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/server'
 import { ImageResponse } from 'takumi-js/response'
-import { initSync, Renderer } from 'takumi-js/wasm'
-import wasmModule from '@takumi-rs/wasm/takumi_wasm_bg.wasm'
+import wasmModule, { initSync, Renderer } from 'takumi-js/wasm'
 import * as Config from './lib/Config'
 import { OgCard } from './lib/Og'
 // @ts-expect-error bytes import
@@ -11,20 +10,14 @@ import cmunbxData from '../public/fonts/cmunbx-clean.ttf?bytes'
 // @ts-expect-error bytes import
 import cmunslData from '../public/fonts/cmunsl-clean.ttf?bytes'
 
-let renderer: Renderer | null = null
-function getRenderer() {
-  if (!renderer) {
-    initSync(wasmModule)
-    renderer = new Renderer({
-      fonts: [
-        { name: 'CMU Serif', data: cmunrmData, weight: 400, style: 'normal' },
-        { name: 'CMU Serif', data: cmunbxData, weight: 700, style: 'normal' },
-        { name: 'CMU Serif', data: cmunslData, weight: 400, style: 'italic' },
-      ],
-    })
-  }
-  return renderer
-}
+initSync(wasmModule)
+const renderer = new Renderer({
+  fonts: [
+    { name: 'CMU Serif', data: cmunrmData, weight: 400, style: 'normal' },
+    { name: 'CMU Serif', data: cmunbxData, weight: 700, style: 'normal' },
+    { name: 'CMU Serif', data: cmunslData, weight: 400, style: 'italic' },
+  ],
+})
 
 const handler = createStartHandler(defaultStreamHandler)
 
@@ -50,7 +43,7 @@ export default {
         {
           width: 1200,
           height: 630,
-          renderer: getRenderer(),
+          renderer,
           headers: {
             'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
           },
