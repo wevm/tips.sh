@@ -1,5 +1,31 @@
 import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/server'
+import { ImageResponse } from 'takumi-js/response'
+import { initSync, Renderer } from 'takumi-js/wasm'
+// @ts-expect-error wasm module import
+import wasmModule from '@takumi-rs/wasm/takumi_wasm_bg.wasm'
 import * as Config from './lib/Config'
+import { OgCard } from './lib/Og'
+// @ts-expect-error bytes import
+import cmunrmData from '../public/fonts/cmunrm-clean.ttf?bytes'
+// @ts-expect-error bytes import
+import cmunbxData from '../public/fonts/cmunbx-clean.ttf?bytes'
+// @ts-expect-error bytes import
+import cmunslData from '../public/fonts/cmunsl-clean.ttf?bytes'
+
+let renderer: Renderer | null = null
+function getRenderer() {
+  if (!renderer) {
+    initSync(wasmModule)
+    renderer = new Renderer({
+      fonts: [
+        { name: 'CMU Serif', data: cmunrmData, weight: 400, style: 'normal' },
+        { name: 'CMU Serif', data: cmunbxData, weight: 700, style: 'normal' },
+        { name: 'CMU Serif', data: cmunslData, weight: 400, style: 'italic' },
+      ],
+    })
+  }
+  return renderer
+}
 
 const handler = createStartHandler(defaultStreamHandler)
 
@@ -10,8 +36,27 @@ export default {
     // /og/:number.png → dynamic OG image
     const ogMatch = url.pathname.match(/^\/og\/(.+)\.png$/)
     if (ogMatch) {
-      const { renderOg } = await import('./lib/og-handler')
-      return renderOg(env, ogMatch[1])
+      const tipNumber = ogMatch[1]
+      const row = await env.DB.prepare('SELECT number, title, authors FROM tips WHERE number = ?')
+        .bind(tipNumber)
+        .first<{
+          number: string
+          title: string
+          authors: string
+        }>()
+      if (!row) return new Response('Not found', { status: 404 })
+
+      return new ImageResponse(
+        <OgCard number={row.number} title={row.title} authors={row.authors} />,
+        {
+          width: 1200,
+          height: 630,
+          renderer: getRenderer(),
+          headers: {
+            'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
+          },
+        },
+      )
     }
 
     if (url.pathname === '/sitemap.xml' && request.method === 'GET') {
