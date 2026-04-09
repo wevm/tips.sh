@@ -37,26 +37,49 @@ export const query = createServerFn({ method: 'POST' })
     // FTS5 query with prefix matching
     const ftsQuery = trimmed
       .split(/\s+/)
-      .map((term) => `"${term}"*`)
+      .filter((term) => term.length > 0)
+      .map((term) => term.replace(/"/g, '""') + '*')
       .join(' ')
 
-    const rows = await db
-      .prepare(
-        `SELECT t.number, t.title, t.authors, t.status,
-                COALESCE(
-                  NULLIF(snippet(tips_fts, 4, '<mark>', '</mark>', '…', 32), ''),
-                  NULLIF(snippet(tips_fts, 3, '<mark>', '</mark>', '…', 32), ''),
-                  snippet(tips_fts, 1, '<mark>', '</mark>', '…', 32)
-                ) as snippet,
-                bm25(tips_fts, 10, 20, 3, 5, 1) as rank
-         FROM tips_fts
-         JOIN tips t ON t.rowid = tips_fts.rowid
-         WHERE tips_fts MATCH ?
-         ORDER BY rank
-         LIMIT 20`,
-      )
-      .bind(ftsQuery)
-      .all<Result>()
+    // Run two queries: title-scoped matches first, then general matches
+    const titleQuery = `title : ${ftsQuery}`
+    const [titleRows, allRows] = await Promise.all([
+      db
+        .prepare(
+          `SELECT t.number, t.title, t.authors, t.status,
+                  snippet(tips_fts, 1, '<mark>', '</mark>', '…', 32) as snippet,
+                  bm25(tips_fts, 10, 50, 3, 5, 1) as rank
+           FROM tips_fts
+           JOIN tips t ON t.rowid = tips_fts.rowid
+           WHERE tips_fts MATCH ?
+           ORDER BY rank
+           LIMIT 10`,
+        )
+        .bind(titleQuery)
+        .all<Result>(),
+      db
+        .prepare(
+          `SELECT t.number, t.title, t.authors, t.status,
+                  COALESCE(
+                    NULLIF(snippet(tips_fts, 4, '<mark>', '</mark>', '…', 32), ''),
+                    NULLIF(snippet(tips_fts, 3, '<mark>', '</mark>', '…', 32), ''),
+                    snippet(tips_fts, 1, '<mark>', '</mark>', '…', 32)
+                  ) as snippet,
+                  bm25(tips_fts, 10, 20, 3, 5, 1) as rank
+           FROM tips_fts
+           JOIN tips t ON t.rowid = tips_fts.rowid
+           WHERE tips_fts MATCH ?
+           ORDER BY rank
+           LIMIT 20`,
+        )
+        .bind(ftsQuery)
+        .all<Result>(),
+    ])
 
-    return rows.results
+    // Merge: title matches first, then remaining general matches
+    const seen = new Set(titleRows.results.map((r) => r.number))
+    return [
+      ...titleRows.results,
+      ...allRows.results.filter((r) => !seen.has(r.number)),
+    ].slice(0, 20)
   })

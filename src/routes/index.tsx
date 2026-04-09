@@ -3,8 +3,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQueryState, parseAsString } from 'nuqs'
 import * as Tips from '#/lib/Tips.fns'
 import * as Search from '#/lib/Search.fns'
-import { baseUrl } from '#/lib/Config'
-import type { Result } from '#/lib/Search'
+import * as Config from '#/lib/Config'
+import type * as SearchTypes from '#/lib/Search'
 
 export const Route = createFileRoute('/')({
   loader: () => Tips.list(),
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/')({
         content:
           'A collection of specifications defining protocol changes and enhancements to the Tempo blockchain.',
       },
-      { property: 'og:url', content: `${baseUrl}/` },
+      { property: 'og:url', content: `${Config.baseUrl}/` },
       { name: 'twitter:card', content: 'summary' },
       {
         name: 'twitter:title',
@@ -36,16 +36,16 @@ export const Route = createFileRoute('/')({
           'A collection of specifications defining protocol changes and enhancements to the Tempo blockchain.',
       },
     ],
-    links: [{ rel: 'canonical', href: `${baseUrl}/` }],
+    links: [{ rel: 'canonical', href: `${Config.baseUrl}/` }],
   }),
   component: TipsIndex,
 })
 
 function TipNumber({ value, prUrl }: { value: string; prUrl?: string }) {
-  const hashIdx = value.indexOf('#')
-  if (hashIdx === -1) return <>{value}</>
-  const base = value.slice(0, hashIdx)
-  const sup = value.slice(hashIdx + 1)
+  const match = value.match(/^(.+)-(\d+)$/)
+  if (!match || !/\d/.test(match[1])) return <>{value}</>
+  const base = match[1]
+  const sup = match[2]
   return (
     <>
       {base}
@@ -152,7 +152,7 @@ function SearchBox({
   )
 }
 
-function SearchResults({ results, activeIndex }: { results: Result[]; activeIndex: number }) {
+function SearchResults({ results, activeIndex }: { results: SearchTypes.Result[]; activeIndex: number }) {
   if (results.length === 0)
     return <p style={{ color: 'var(--color-text-muted)', marginTop: '1.5em' }}>No results found.</p>
 
@@ -223,7 +223,7 @@ function SearchResults({ results, activeIndex }: { results: Result[]; activeInde
 function TipsIndex() {
   const tips = Route.useLoaderData()
   const [query, setQuery] = useQueryState('q', parseAsString.withDefault(''))
-  const [results, setResults] = useState<Result[] | null>(null)
+  const [results, setResults] = useState<SearchTypes.Result[] | null>(null)
   const [searching, setSearching] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)

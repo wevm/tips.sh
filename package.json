@@ -9,8 +9,9 @@
     "build": "vp build",
     "check": "vp check --fix",
     "check:types": "tsc --noEmit",
+    "db:init": "wrangler d1 migrations apply tips --local && pnpm sync",
     "deploy": "npm run build && wrangler deploy",
-    "dev": "vp dev --port 3000",
+    "dev": "vite dev --port 3000",
     "gen:types": "wrangler types",
     "postinstall": "npm run gen:types",
     "prebuild": "node --env-file=.env --import=tsx scripts/gen-robots.ts",
@@ -24,6 +25,7 @@
     "@mdx-js/mdx": "^3.1.1",
     "@shikijs/engine-javascript": "^4.0.2",
     "@tailwindcss/vite": "^4.1.18",
+    "@takumi-rs/wasm": "^0.73.1",
     "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-router": "^1.132.0",
     "@tanstack/react-router-devtools": "^1.132.0",
@@ -57,13 +59,10 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
     "jsdom": "^27.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.2",
     "vite-plus": "^0.1.16",
     "vite-tsconfig-paths": "^5.1.4",
     "wrangler": "^4.81.1"
-  },
-  "overrides": {
-    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
   }
 }

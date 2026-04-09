@@ -1,11 +1,6 @@
 /** GitHub → D1 sync for TIPs. KV is only used for the sync lock. */
 
-import { parseTitle, parseStatus, parseAbstract, parseAuthors } from './Tips'
-
-async function getEnv() {
-  const { env } = await import('cloudflare:workers')
-  return env
-}
+import * as Tips from './Tips'
 
 function ghHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {
@@ -50,7 +45,7 @@ async function raw(ref: string, path: string, token?: string): Promise<string> {
   return res.text()
 }
 
-type TipRow = {
+export type TipRow = {
   number: string
   title: string
   authors: string
@@ -63,20 +58,26 @@ type TipRow = {
   createdAt: string
 }
 
-/** Attempt sync with KV-based lock. Returns false if already syncing. */
-export async function trySync(): Promise<boolean> {
-  const env = await getEnv()
-  const kv = env.TIPS_KV
-  const lock = await kv.get('tips:syncing')
-  if (lock) return false
-  await kv.put('tips:syncing', '1', { expirationTtl: 120 })
-  try {
-    const token = (env as unknown as Record<string, unknown>).GITHUB_TOKEN as string | undefined
-    await sync(env.DB, token)
-  } finally {
-    await kv.delete('tips:syncing')
+function parseTipRow(
+  content: string,
+  filename: string,
+  prJson: string,
+  createdAt: string,
+): TipRow {
+  const { number, title } = Tips.parseTitle(content)
+  const pvMatch = content.match(/\*\*Protocol Version\*\*[:\s]*(.+)/i)
+  return {
+    number,
+    title,
+    authors: Tips.parseAuthors(content),
+    status: Tips.parseStatus(content),
+    abstract: Tips.parseAbstract(content),
+    content,
+    filename,
+    protocolVersion: pvMatch ? pvMatch[1].trim() : '',
+    prJson,
+    createdAt,
   }
-  return true
 }
 
 async function fetchPrTips(token?: string): Promise<TipRow[]> {
@@ -85,6 +86,7 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
     const allPrs: Array<{
       number: number
       title: string
+      body: string | null
       html_url: string
       head: { ref: string }
     }> = []
@@ -102,7 +104,7 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
       page++
     }
 
-    const tipPrs = allPrs.filter((pr) => /tip/i.test(pr.title) && /tip[-/]\d+/i.test(pr.head.ref))
+    const tipPrs = allPrs.filter((pr) => /tip/i.test(pr.title) || /tip/i.test(pr.body ?? ''))
 
     const results: TipRow[] = []
 
@@ -126,25 +128,18 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
       if (!tipFile) continue
 
       const content = await raw(pr.head.ref, tipFile.filename, token)
-      const { number, title } = parseTitle(content)
-      const pvMatch = content.match(/\*\*Protocol Version\*\*[:\s]*(.+)/i)
-
-      results.push({
-        number,
-        title,
-        authors: parseAuthors(content),
-        status: parseStatus(content),
-        abstract: parseAbstract(content),
-        content,
-        filename: tipFile.filename.replace('tips/', ''),
-        protocolVersion: pvMatch ? pvMatch[1].trim() : '',
-        prJson: JSON.stringify({
-          number: pr.number,
-          url: pr.html_url,
-          branch: pr.head.ref,
-        }),
-        createdAt: '',
-      })
+      results.push(
+        parseTipRow(
+          content,
+          tipFile.filename.replace('tips/', ''),
+          JSON.stringify({
+            number: pr.number,
+            url: pr.html_url,
+            branch: pr.head.ref,
+          }),
+          '',
+        ),
+      )
     }
 
     return results
@@ -153,7 +148,8 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
   }
 }
 
-async function sync(db: D1Database, token?: string) {
+/** Fetch all TIPs (merged + open PRs) from GitHub. */
+export async function fetchAllTips(token?: string): Promise<TipRow[]> {
   const treeRes = await fetch(
     'https://api.github.com/repos/tempoxyz/tempo/git/trees/main?recursive=1',
     { headers: ghHeaders(token) },
@@ -172,34 +168,48 @@ async function sync(db: D1Database, token?: string) {
           raw('main', f.path, token),
           firstCommitDate(f.path, token),
         ])
-        const { number, title } = parseTitle(content)
-        const pvMatch = content.match(/\*\*Protocol Version\*\*[:\s]*(.+)/i)
-        return {
-          number,
-          title,
-          authors: parseAuthors(content),
-          status: parseStatus(content),
-          abstract: parseAbstract(content),
-          content,
-          filename: f.path.replace('tips/', ''),
-          protocolVersion: pvMatch ? pvMatch[1].trim() : '',
-          prJson: '',
-          createdAt,
-        } satisfies TipRow
+        return parseTipRow(content, f.path.replace('tips/', ''), '', createdAt)
       }),
     ),
     fetchPrTips(token),
   ])
 
-  // All PR tips get an incrementing super number per base TIP
-  const prCountByBase = new Map<string, number>()
-  const prTipsResolved = prTips.map((d) => {
-    const count = (prCountByBase.get(d.number) ?? 0) + 1
-    prCountByBase.set(d.number, count)
-    return { ...d, number: `${d.number}#${count}` }
-  })
-  const allTips = [...mergedDetails, ...prTipsResolved]
+  // Count how many times each number appears across merged + PR TIPs
+  const countByNumber = new Map<string, number>()
+  for (const d of mergedDetails) countByNumber.set(d.number, (countByNumber.get(d.number) ?? 0) + 1)
+  for (const d of prTips) countByNumber.set(d.number, (countByNumber.get(d.number) ?? 0) + 1)
 
+  // Append #N suffix only when a number has duplicates
+  const seenByBase = new Map<string, number>()
+  const prTipsResolved = prTips.map((d) => {
+    const total = countByNumber.get(d.number) ?? 1
+    if (total <= 1) return d
+    const idx = (seenByBase.get(d.number) ?? 0) + 1
+    seenByBase.set(d.number, idx)
+    return { ...d, number: `${d.number}-${idx}` }
+  })
+
+  return [...mergedDetails, ...prTipsResolved]
+}
+
+/** Attempt sync with KV-based lock. Returns false if already syncing. */
+export async function trySync(): Promise<boolean> {
+  const { env } = await import('cloudflare:workers')
+  const kv = env.TIPS_KV
+  const lock = await kv.get('tips:syncing')
+  if (lock) return false
+  await kv.put('tips:syncing', '1', { expirationTtl: 120 })
+  try {
+    const token = (env as unknown as Record<string, unknown>).GITHUB_TOKEN as string | undefined
+    const allTips = await fetchAllTips(token)
+    await writeToD1(env.DB, allTips)
+  } finally {
+    await kv.delete('tips:syncing')
+  }
+  return true
+}
+
+async function writeToD1(db: D1Database, allTips: TipRow[]) {
   // Drop FTS triggers, clear tables, reinsert, recreate triggers
   await db.batch([
     db.prepare('DROP TRIGGER IF EXISTS tips_ai'),

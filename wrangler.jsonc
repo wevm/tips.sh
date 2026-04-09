@@ -1,10 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "tips",
-  "compatibility_date": "2025-09-02",
+  "account_id": "87fe88909d057ae3212762565f9d8c5b",
+  "compatibility_date": "2026-04-09",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/worker.tsx",
-
   "observability": {
     "enabled": true,
   },

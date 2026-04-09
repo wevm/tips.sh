@@ -15,7 +15,7 @@ export const list = createServerFn().handler(async () => {
     await db()
   )
     .prepare(
-      'SELECT number, title, authors, status, abstract, filename, pr_json FROM tips ORDER BY CAST(number AS INTEGER)',
+      `SELECT number, title, authors, status, abstract, filename, pr_json FROM tips ORDER BY CASE WHEN number GLOB '[0-9]*' THEN 0 ELSE 1 END, CAST(number AS INTEGER)`,
     )
     .all<{
       number: string

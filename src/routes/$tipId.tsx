@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { baseUrl } from '#/lib/Config'
+import * as Config from '#/lib/Config'
 import * as Tips from '#/lib/Tips.fns'
 import * as Markdown from '#/lib/Markdown'
 
@@ -21,7 +21,7 @@ export const Route = createFileRoute('/$tipId')({
     const tip = loaderData?.tip
     const title = tip ? `TIP-${tip.number}: ${tip.title}` : 'Tempo TIP'
     const description = tip?.abstract?.slice(0, 160) || 'A Tempo Improvement Proposal'
-    const url = tip ? `${baseUrl}/${tip.number}` : baseUrl
+    const url = tip ? `${Config.baseUrl}/${tip.number}` : Config.baseUrl
 
     return {
       meta: [
@@ -31,11 +31,11 @@ export const Route = createFileRoute('/$tipId')({
         { property: 'og:title', content: title },
         { property: 'og:description', content: description },
         { property: 'og:url', content: url },
-        { property: 'og:image', content: tip ? `${baseUrl}/og/${tip.number}.png` : undefined },
+        { property: 'og:image', content: tip ? `${Config.baseUrl}/og/${tip.number}.png` : undefined },
         { property: 'og:image:width', content: '1200' },
         { property: 'og:image:height', content: '630' },
         { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:image', content: tip ? `${baseUrl}/og/${tip.number}.png` : undefined },
+        { name: 'twitter:image', content: tip ? `${Config.baseUrl}/og/${tip.number}.png` : undefined },
       ],
       links: [{ rel: 'canonical', href: url }],
       scripts: tip
@@ -83,7 +83,7 @@ function TipPage() {
       <article>
         <header className="tip-frontmatter">
           <h1>
-            TIP-{tip.number}: {tip.title}
+            TIP-<TipNumber value={tip.number} prUrl={tip.pr?.url} />: {tip.title}
           </h1>
           {tip.authors && <p style={{ fontStyle: 'italic' }}>{tip.authors}</p>}
           {tip.createdAt && (
@@ -129,5 +129,29 @@ function TipPage() {
         <div className="tip-body" dangerouslySetInnerHTML={{ __html: html }} />
       </article>
     </main>
+  )
+}
+
+function TipNumber({ value, prUrl }: { value: string; prUrl?: string }) {
+  const match = value.match(/^(.+)-(\d+)$/)
+  if (!match || !/\d/.test(match[1])) return <>{value}</>
+  const base = match[1]
+  const sup = match[2]
+  return (
+    <>
+      {base}
+      {prUrl ? (
+        <a
+          href={prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ textDecoration: 'none' }}
+        >
+          <sup style={{ fontSize: '0.5em', color: 'var(--color-link)' }}>{sup}</sup>
+        </a>
+      ) : (
+        <sup style={{ fontSize: '0.5em', color: 'var(--color-text-muted)' }}>{sup}</sup>
+      )}
+    </>
   )
 }

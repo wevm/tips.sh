@@ -44,15 +44,22 @@ export function parseFrontmatter(content: string): Record<string, string> {
   return fm
 }
 
+/** Derive a slug from the first two words of a title, lowercased. */
+function titleSlug(title: string): string {
+  return title.trim().split(/\s+/).slice(0, 2).join('-').toLowerCase()
+}
+
 /** Extract TIP number and title from content. */
 export function parseTitle(content: string): { number: string; title: string } {
   const fm = parseFrontmatter(content)
   if (fm.id && fm.title) {
-    const num = fm.id.match(/TIP-(\d+)/)?.[1] ?? '0'
-    return { number: num, title: fm.title }
+    const num = fm.id.match(/TIP-(\d+)/)?.[1]
+    return { number: num ?? titleSlug(fm.title), title: fm.title }
   }
   const match = content.match(/^# TIP-(\d+):\s*(.+)$/m)
   if (match) return { number: match[1], title: match[2].trim() }
+  const titleMatch = content.match(/^# TIP-\S+:\s*(.+)$/m)
+  if (titleMatch) return { number: titleSlug(titleMatch[1].trim()), title: titleMatch[1].trim() }
   return { number: '0', title: 'Unknown' }
 }
 

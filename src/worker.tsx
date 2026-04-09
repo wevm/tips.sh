@@ -1,10 +1,9 @@
 import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/server'
 import { ImageResponse } from 'takumi-js/response'
 import { initSync, Renderer } from 'takumi-js/wasm'
-// @ts-expect-error wasm module import
 import wasmModule from '@takumi-rs/wasm/takumi_wasm_bg.wasm'
-import { baseUrl } from './lib/Config'
-import { OgCard } from './lib/Og'
+import * as Config from './lib/Config'
+import * as Og from './lib/Og'
 // @ts-expect-error bytes import
 import cmunrmData from '../public/fonts/cmunrm-clean.ttf?bytes'
 // @ts-expect-error bytes import
@@ -12,14 +11,20 @@ import cmunbxData from '../public/fonts/cmunbx-clean.ttf?bytes'
 // @ts-expect-error bytes import
 import cmunslData from '../public/fonts/cmunsl-clean.ttf?bytes'
 
-initSync(wasmModule)
-const renderer = new Renderer({
-  fonts: [
-    { name: 'CMU Serif', data: cmunrmData, weight: 400, style: 'normal' },
-    { name: 'CMU Serif', data: cmunbxData, weight: 700, style: 'normal' },
-    { name: 'CMU Serif', data: cmunslData, weight: 400, style: 'italic' },
-  ],
-})
+let renderer: Renderer
+function getRenderer() {
+  if (!renderer) {
+    initSync({ module: wasmModule })
+    renderer = new Renderer({
+      fonts: [
+        { name: 'CMU Serif', data: cmunrmData, weight: 400, style: 'normal' },
+        { name: 'CMU Serif', data: cmunbxData, weight: 700, style: 'normal' },
+        { name: 'CMU Serif', data: cmunslData, weight: 400, style: 'italic' },
+      ],
+    })
+  }
+  return renderer
+}
 
 const handler = createStartHandler(defaultStreamHandler)
 
@@ -41,11 +46,11 @@ export default {
       if (!row) return new Response('Not found', { status: 404 })
 
       return new ImageResponse(
-        <OgCard number={row.number} title={row.title} authors={row.authors} />,
+        <Og.OgCard number={row.number} title={row.title} authors={row.authors} />,
         {
           width: 1200,
           height: 630,
-          renderer,
+          renderer: getRenderer(),
           headers: {
             'Cache-Control': 'public, max-age=3600',
           },
@@ -54,16 +59,15 @@ export default {
     }
 
     if (url.pathname === '/sitemap.xml' && request.method === 'GET') {
-      const rows = await env.DB.prepare('SELECT number FROM tips').all<{
+      const rows = await env.DB.prepare("SELECT number FROM tips WHERE pr_json = '' OR pr_json IS NULL").all<{
         number: string
       }>()
       const urls = rows.results
-        .filter((r) => !r.number.includes('#'))
-        .map((r) => `<url><loc>${baseUrl}/${r.number}</loc></url>`)
+        .map((r) => `<url><loc>${Config.baseUrl}/${r.number}</loc></url>`)
         .join('')
       const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>${baseUrl}/</loc></url>
+  <url><loc>${Config.baseUrl}/</loc></url>
   ${urls}
 </urlset>`
       return new Response(sitemap, {

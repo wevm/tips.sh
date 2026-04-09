@@ -1,6 +1,6 @@
 import { createStart } from '@tanstack/react-start'
-import { middleware as mdRouter } from '#/lib/MdRouter'
+import * as MdRouter from '#/lib/MdRouter'
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [mdRouter],
+  requestMiddleware: [MdRouter.middleware],
 }))
