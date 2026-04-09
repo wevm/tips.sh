@@ -38,6 +38,7 @@ jobs:
         run: pnpm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_BASE_URL: https://tips.sh
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3

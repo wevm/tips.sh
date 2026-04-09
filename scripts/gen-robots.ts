@@ -2,8 +2,7 @@
 
 import { writeFileSync } from 'fs'
 
-const baseUrl = process.env.VITE_BASE_URL
-if (!baseUrl) throw new Error('VITE_BASE_URL is required')
+const baseUrl = process.env.VITE_BASE_URL ?? 'https://tips.sh'
 
 writeFileSync(
   'public/robots.txt',
