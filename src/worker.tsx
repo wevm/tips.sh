@@ -2,7 +2,7 @@ import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/
 import { ImageResponse } from 'takumi-js/response'
 import wasmModule, { initSync, Renderer } from 'takumi-js/wasm'
 import * as Config from './lib/Config'
-import { OgCard } from './lib/Og'
+import { OgCard, OgIndex } from './lib/Og'
 // @ts-expect-error bytes import
 import cmunrmData from '../public/fonts/cmunrm-clean.ttf?bytes'
 // @ts-expect-error bytes import
@@ -24,6 +24,18 @@ const handler = createStartHandler(defaultStreamHandler)
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url)
+
+    // /og/index.png → index OG image
+    if (url.pathname === '/og/index.png') {
+      return new ImageResponse(<OgIndex />, {
+        width: 1200,
+        height: 630,
+        renderer,
+        headers: {
+          'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
+        },
+      })
+    }
 
     // /og/:number.png → dynamic OG image
     const ogMatch = url.pathname.match(/^\/og\/(.+)\.png$/)

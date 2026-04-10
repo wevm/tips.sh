@@ -25,7 +25,11 @@ export const Route = createFileRoute('/')({
           'A collection of specifications defining protocol changes and enhancements to the Tempo blockchain.',
       },
       { property: 'og:url', content: `${Config.baseUrl}/` },
-      { name: 'twitter:card', content: 'summary' },
+      { property: 'og:image', content: `${Config.baseUrl}/og/index.png` },
+      { property: 'og:image:width', content: '1200' },
+      { property: 'og:image:height', content: '630' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:image', content: `${Config.baseUrl}/og/index.png` },
       {
         name: 'twitter:title',
         content: 'Tempo Improvement Proposals',
@@ -173,8 +177,9 @@ function SearchResults({ results, activeIndex }: { results: SearchTypes.Result[]
           <div
             style={{
               display: 'flex',
+              flexWrap: 'wrap',
               alignItems: 'baseline',
-              gap: '0.6em',
+              gap: '0.4em 0.6em',
               marginBottom: '0.3em',
             }}
           >
@@ -189,7 +194,7 @@ function SearchResults({ results, activeIndex }: { results: SearchTypes.Result[]
               TIP-
               <TipNumber value={r.number} />
             </span>
-            <span style={{ fontWeight: 700 }}>{r.title}</span>
+            <span style={{ fontWeight: 700, minWidth: 0 }}>{r.title}</span>
             <span style={{ marginLeft: 'auto', flexShrink: 0 }}>
               <StatusBadge status={r.status} />
             </span>
@@ -293,6 +298,7 @@ function TipsIndex() {
             results && <SearchResults results={results} activeIndex={activeIndex} />
           )
         ) : (
+          <div style={{ overflowX: 'auto' }}>
           <table style={{ marginTop: '0.5em' }}>
             <caption className="sr-only">List of Tempo Improvement Proposals</caption>
             <thead>
@@ -330,6 +336,7 @@ function TipsIndex() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </main>

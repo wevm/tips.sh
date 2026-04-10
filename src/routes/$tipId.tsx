@@ -97,29 +97,23 @@ function TipPage() {
               Protocol Version: <strong>{tip.protocolVersion}</strong>
             </p>
           )}
-          {tip.pr && (
-            <p style={{ fontSize: '0.85em' }}>
-              Proposed in{' '}
-              <a href={tip.pr.url} target="_blank" rel="noopener noreferrer">
-                PR #{tip.pr.number}
-              </a>
-            </p>
-          )}
           <p style={{ fontSize: '0.85em' }}>
-            <a href={`/${tip.number}.pdf`} style={{ marginRight: '1em' }}>
-              Download PDF
-            </a>
-            <a
-              href={
-                tip.pr
-                  ? `${tip.pr.url}/files`
-                  : `https://github.com/tempoxyz/tempo/blob/main/tips/tip-${tip.number}.md`
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View on GitHub
-            </a>
+            {tip.pr ? (
+              <>
+                Proposed in{' '}
+                <a href={tip.pr.url} target="_blank" rel="noopener noreferrer">
+                  PR #{tip.pr.number}
+                </a>
+              </>
+            ) : (
+              <a
+                href={`https://github.com/tempoxyz/tempo/blob/main/tips/tip-${tip.number}.md`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View on GitHub
+              </a>
+            )}
           </p>
         </header>
 

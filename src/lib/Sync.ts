@@ -17,7 +17,7 @@ async function firstCommitDate(path: string, token?: string): Promise<string> {
       `https://api.github.com/repos/tempoxyz/tempo/commits?path=${encodeURIComponent(path)}&per_page=1&page=1`,
       { headers: ghHeaders(token) },
     )
-    if (!res.ok) return ''
+    if (!res.ok) return new Date().toISOString().slice(0, 10)
     // GitHub returns newest first by default; get the Link header for last page
     const link = res.headers.get('link')
     if (link) {
@@ -34,7 +34,7 @@ async function firstCommitDate(path: string, token?: string): Promise<string> {
     const commits = (await res.json()) as Array<{ commit: { committer: { date: string } } }>
     if (commits.length > 0) return commits[commits.length - 1].commit.committer.date.slice(0, 10)
   } catch {}
-  return ''
+  return new Date().toISOString().slice(0, 10)
 }
 
 async function raw(ref: string, path: string, token?: string): Promise<string> {
@@ -88,6 +88,7 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
       title: string
       body: string | null
       html_url: string
+      created_at: string
       head: { ref: string }
     }> = []
     let page = 1
@@ -137,7 +138,7 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
             url: pr.html_url,
             branch: pr.head.ref,
           }),
-          '',
+          pr.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
         ),
       )
     }
