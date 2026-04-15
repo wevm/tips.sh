@@ -211,14 +211,8 @@ export async function trySync(): Promise<boolean> {
 }
 
 async function writeToD1(db: D1Database, allTips: TipRow[]) {
-  // Drop FTS triggers, clear tables, reinsert, recreate triggers
-  await db.batch([
-    db.prepare('DROP TRIGGER IF EXISTS tips_ai'),
-    db.prepare('DROP TRIGGER IF EXISTS tips_ad'),
-    db.prepare('DROP TRIGGER IF EXISTS tips_au'),
-    db.prepare('DELETE FROM tips_fts'),
-    db.prepare('DELETE FROM tips'),
-  ])
+  // Clear content table and reinsert all rows
+  await db.batch([db.prepare('DELETE FROM tips')])
 
   const stmt = db.prepare(
     'INSERT INTO tips (number, title, authors, status, abstract, content, filename, protocol_version, pr_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -240,31 +234,6 @@ async function writeToD1(db: D1Database, allTips: TipRow[]) {
     ),
   )
 
-  // Rebuild FTS index and triggers
-  await db.batch([
-    db.prepare(
-      `INSERT INTO tips_fts(rowid, number, title, authors, abstract, content)
-       SELECT rowid, number, title, authors, abstract, content FROM tips`,
-    ),
-    db.prepare(
-      `CREATE TRIGGER tips_ai AFTER INSERT ON tips BEGIN
-         INSERT INTO tips_fts(rowid, number, title, authors, abstract, content)
-         VALUES (new.rowid, new.number, new.title, new.authors, new.abstract, new.content);
-       END`,
-    ),
-    db.prepare(
-      `CREATE TRIGGER tips_ad AFTER DELETE ON tips BEGIN
-         INSERT INTO tips_fts(tips_fts, rowid, number, title, authors, abstract, content)
-         VALUES ('delete', old.rowid, old.number, old.title, old.authors, old.abstract, old.content);
-       END`,
-    ),
-    db.prepare(
-      `CREATE TRIGGER tips_au AFTER UPDATE ON tips BEGIN
-         INSERT INTO tips_fts(tips_fts, rowid, number, title, authors, abstract, content)
-         VALUES ('delete', old.rowid, old.number, old.title, old.authors, old.abstract, old.content);
-         INSERT INTO tips_fts(rowid, number, title, authors, abstract, content)
-         VALUES (new.rowid, new.number, new.title, new.authors, new.abstract, new.content);
-       END`,
-    ),
-  ])
+  // Rebuild FTS index from content table
+  await db.batch([db.prepare(`INSERT INTO tips_fts(tips_fts) VALUES ('rebuild')`)])
 }
