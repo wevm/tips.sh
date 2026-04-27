@@ -74,7 +74,9 @@ export const get = createServerFn({ method: 'POST' })
     if (!row) throw new Error(`TIP ${tipId} not found`)
 
     const contentHash = await sha256(row.content)
-    const cacheKey = `tip:html:${row.number}:${contentHash}`
+    // Bump suffix when the markdown renderer output changes (e.g., new
+    // heading anchors) so cached HTML is invalidated.
+    const cacheKey = `tip:html:${row.number}:${contentHash}:v2`
     const kvStore = await kv()
 
     let html = await kvStore.get(cacheKey)
