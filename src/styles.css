@@ -481,6 +481,12 @@ mark {
   border-radius: 2px;
 }
 
+/* ── User Highlights (CSS Custom Highlight API) ── */
+::highlight(user-highlight) {
+  background-color: #fff3b0;
+  color: inherit;
+}
+
 /* ── Visually Hidden (screen readers only) ── */
 .sr-only {
   position: absolute;
