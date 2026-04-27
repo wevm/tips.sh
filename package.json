@@ -63,7 +63,7 @@
     "jsdom": "^27.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.2",
-    "vite-plus": "^0.1.16",
+    "vite-plus": "0.1.16",
     "vite-tsconfig-paths": "^5.1.4",
     "wrangler": "^4.81.1"
   }

@@ -278,12 +278,124 @@ figcaption {
 }
 
 /* ── TIP Article Layout ── */
+.tip-layout {
+  position: relative;
+}
+
 .tip-article {
   max-width: var(--content-width);
   margin: 0 auto;
   padding: 3rem 1.5rem 5rem;
   overflow-wrap: break-word;
   word-wrap: break-word;
+}
+
+/* ── Table of Contents (right margin, LaTeX style) ── */
+.tip-toc {
+  display: none;
+}
+
+@media (min-width: 1240px) {
+  .tip-toc {
+    display: block;
+    position: fixed;
+    top: 3rem;
+    right: 2rem;
+    width: 240px;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 2rem,
+      #000 calc(100% - 2rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 2rem,
+      #000 calc(100% - 2rem),
+      transparent 100%
+    );
+  }
+
+  .tip-toc::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tip-toc-inner {
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+    padding: 1rem 0.5rem 1rem 0;
+  }
+
+  .tip-toc-title {
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--color-text);
+    margin: 0 0 0.6em;
+    letter-spacing: 0.02em;
+  }
+
+  .tip-toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 0.5px solid var(--color-rule-light);
+  }
+
+  .tip-toc-item {
+    margin: 0;
+  }
+
+  .tip-toc-item a {
+    display: flex;
+    gap: 0.5em;
+    padding: 0.15em 0 0.15em 0.8em;
+    color: inherit;
+    text-decoration: none;
+    border-left: 1.5px solid transparent;
+    margin-left: -0.75px;
+    transition: color 0.12s ease, border-color 0.12s ease;
+  }
+
+  .tip-toc-item a:hover {
+    color: var(--color-text);
+  }
+
+  .tip-toc-item.is-active > a {
+    color: var(--color-text);
+    border-left-color: var(--color-rule);
+  }
+
+  .tip-toc-l3 a {
+    padding-left: 1.6em;
+    font-size: 0.8rem;
+  }
+
+  .tip-toc-num {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+  }
+
+  .tip-toc-item.is-active .tip-toc-num {
+    color: var(--color-text);
+  }
+
+  .tip-toc-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
 }
 
 /* ── TIP Frontmatter (\maketitle) ── */
@@ -320,6 +432,32 @@ figcaption {
 
 .tip-body > *:first-child {
   margin-top: 0;
+}
+
+/* ── Heading anchor links ── */
+.heading-anchor {
+  scroll-margin-top: 1em;
+}
+
+.heading-anchor .heading-link {
+  color: inherit;
+  text-decoration: none;
+  position: relative;
+}
+
+.heading-anchor .heading-link::before {
+  content: '#';
+  position: absolute;
+  left: -0.85em;
+  color: var(--color-text-muted);
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.heading-anchor:hover .heading-link::before,
+.heading-anchor .heading-link:focus::before {
+  opacity: 0.6;
 }
 
 /* ── Status Badges ── */

@@ -76,17 +76,38 @@ function rehypeShiki() {
 function rehypeHeadingIds() {
   return async (tree: import('hast').Root) => {
     const { visit } = await import('unist-util-visit')
+    const seen = new Map<string, number>()
     visit(tree, 'element', (node: Element) => {
       if (!/^h[1-6]$/.test(node.tagName)) return
       const text = getTextContent(node)
-      const id = text
+      const base = text
         .toLowerCase()
         .replace(/[^\w\s-]/g, '')
         .replace(/\s+/g, '-')
         .replace(/-+/g, '-')
-        .trim()
+        .replace(/^-+|-+$/g, '')
+      if (!base) return
+      const count = seen.get(base) ?? 0
+      const id = count === 0 ? base : `${base}-${count}`
+      seen.set(base, count + 1)
       node.properties = node.properties ?? {}
       node.properties.id = id
+      node.properties.className = [
+        ...((node.properties.className as string[]) ?? []),
+        'heading-anchor',
+      ]
+      node.children = [
+        {
+          type: 'element',
+          tagName: 'a',
+          properties: {
+            href: `#${id}`,
+            className: ['heading-link'],
+            'aria-label': `Link to ${text}`,
+          },
+          children: node.children,
+        },
+      ]
     })
   }
 }

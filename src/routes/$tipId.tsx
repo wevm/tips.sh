@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
 import * as Config from '#/lib/Config'
 import * as Tips from '#/lib/Tips.fns'
 
@@ -62,22 +63,24 @@ export const Route = createFileRoute('/$tipId')({
 
 function TipPage() {
   const { tip, html } = Route.useLoaderData()
+  const headings = useMemo(() => extractHeadings(html), [html])
 
   return (
-    <main className="tip-article">
-      <nav aria-label="Breadcrumb" style={{ marginBottom: '2em' }}>
-        <Link
-          to="/"
-          style={{
-            fontSize: '0.9rem',
-            color: 'var(--color-text-muted)',
-          }}
-        >
-          ← All TIPs
-        </Link>
-      </nav>
+    <div className="tip-layout">
+      <main className="tip-article">
+        <nav aria-label="Breadcrumb" style={{ marginBottom: '2em' }}>
+          <Link
+            to="/"
+            style={{
+              fontSize: '0.9rem',
+              color: 'var(--color-text-muted)',
+            }}
+          >
+            ← All TIPs
+          </Link>
+        </nav>
 
-      <article>
+        <article>
         <header className="tip-frontmatter">
           <h1>
             TIP-<TipNumber value={tip.number} prUrl={tip.pr?.url} />: {tip.title}
@@ -117,9 +120,99 @@ function TipPage() {
           </p>
         </header>
 
-        <div className="tip-body" dangerouslySetInnerHTML={{ __html: html }} />
-      </article>
-    </main>
+          <div className="tip-body" dangerouslySetInnerHTML={{ __html: html }} />
+        </article>
+      </main>
+      <TableOfContents headings={headings} />
+    </div>
+  )
+}
+
+type Heading = { id: string; text: string; level: number }
+
+function extractHeadings(html: string): Heading[] {
+  const re = /<h([23])\s+[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/h\1>/g
+  const out: Heading[] = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html))) {
+    const text = m[3]
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!text) continue
+    out.push({ id: m[2], text, level: Number(m[1]) })
+  }
+  return out
+}
+
+function TableOfContents({ headings }: { headings: Heading[] }) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (headings.length === 0) return
+
+    const update = () => {
+      const offset = 120
+      // If scrolled to the bottom, activate the last heading
+      const scrollBottom = window.scrollY + window.innerHeight
+      if (scrollBottom >= document.documentElement.scrollHeight - 4) {
+        setActiveId(headings[headings.length - 1].id)
+        return
+      }
+      // Otherwise pick the last heading whose top is above the offset
+      let current: string | null = null
+      for (const h of headings) {
+        const el = document.getElementById(h.id)
+        if (!el) continue
+        if (el.getBoundingClientRect().top - offset <= 0) current = h.id
+        else break
+      }
+      setActiveId(current ?? headings[0].id)
+    }
+
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [headings])
+
+  if (headings.length < 2) return null
+
+  // Compute LaTeX-style numbering (1, 1.1, 1.2, 2, 2.1 …)
+  let h2Index = 0
+  let h3Index = 0
+  const numbered = headings.map((h) => {
+    if (h.level === 2) {
+      h2Index += 1
+      h3Index = 0
+      return { ...h, number: `${h2Index}` }
+    }
+    h3Index += 1
+    return { ...h, number: `${h2Index}.${h3Index}` }
+  })
+
+  return (
+    <aside className="tip-toc" aria-label="Table of contents">
+      <div className="tip-toc-inner">
+        <p className="tip-toc-title">Contents</p>
+        <ol className="tip-toc-list">
+          {numbered.map((h) => (
+            <li
+              key={h.id}
+              className={`tip-toc-item tip-toc-l${h.level}${activeId === h.id ? ' is-active' : ''}`}
+            >
+              <a href={`#${h.id}`}>
+                <span className="tip-toc-num">{h.number}</span>
+                <span className="tip-toc-text">{h.text}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </aside>
   )
 }
 

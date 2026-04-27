@@ -5,8 +5,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@latest
-  vitest: npm:@voidzero-dev/vite-plus-test@latest
+  vite: npm:@voidzero-dev/vite-plus-core@0.1.16
+  vitest: npm:@voidzero-dev/vite-plus-test@0.1.16
 
 importers:
 
@@ -134,7 +134,7 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
       vite-plus:
-        specifier: ^0.1.16
+        specifier: 0.1.16
         version: 0.1.16(@types/node@22.19.17)(jiti@2.6.1)(jsdom@27.4.0)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0))
       vite-tsconfig-paths:
         specifier: ^5.1.4
