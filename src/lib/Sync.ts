@@ -37,11 +37,16 @@ async function firstCommitDate(path: string, token?: string): Promise<string> {
   return new Date().toISOString().slice(0, 10)
 }
 
-async function raw(ref: string, path: string, token?: string): Promise<string> {
-  const res = await fetch(`https://raw.githubusercontent.com/tempoxyz/tempo/${ref}/${path}`, {
+async function raw(
+  repo: string,
+  ref: string,
+  path: string,
+  token?: string,
+): Promise<string> {
+  const res = await fetch(`https://raw.githubusercontent.com/${repo}/${ref}/${path}`, {
     headers: ghHeaders(token),
   })
-  if (!res.ok) throw new Error(`Failed to fetch ${path}: ${res.status}`)
+  if (!res.ok) throw new Error(`Failed to fetch ${path}@${repo}/${ref}: ${res.status}`)
   return res.text()
 }
 
@@ -81,35 +86,37 @@ function parseTipRow(
 }
 
 async function fetchPrTips(token?: string): Promise<TipRow[]> {
-  try {
-    // Paginate through all open PRs
-    const allPrs: Array<{
-      number: number
-      title: string
-      body: string | null
-      html_url: string
-      created_at: string
-      head: { ref: string }
-    }> = []
-    let page = 1
-    while (true) {
-      const res = await fetch(
-        `https://api.github.com/repos/tempoxyz/tempo/pulls?state=open&per_page=100&page=${page}`,
-        { headers: ghHeaders(token) },
-      )
-      if (!res.ok) break
-      const prs = (await res.json()) as typeof allPrs
-      if (prs.length === 0) break
-      allPrs.push(...prs)
-      if (prs.length < 100) break
-      page++
-    }
+  // Paginate through all open PRs
+  const allPrs: Array<{
+    number: number
+    title: string
+    body: string | null
+    html_url: string
+    created_at: string
+    head: { ref: string; repo: { full_name: string } | null }
+  }> = []
+  let page = 1
+  while (true) {
+    const res = await fetch(
+      `https://api.github.com/repos/tempoxyz/tempo/pulls?state=open&per_page=100&page=${page}`,
+      { headers: ghHeaders(token) },
+    )
+    if (!res.ok) break
+    const prs = (await res.json()) as typeof allPrs
+    if (prs.length === 0) break
+    allPrs.push(...prs)
+    if (prs.length < 100) break
+    page++
+  }
 
-    const tipPrs = allPrs.filter((pr) => /tip/i.test(pr.title) || /tip/i.test(pr.body ?? ''))
+  const tipPrs = allPrs.filter((pr) => /tip/i.test(pr.title) || /tip/i.test(pr.body ?? ''))
 
-    const results: TipRow[] = []
+  const results: TipRow[] = []
 
-    for (const pr of tipPrs) {
+  // Process each PR in isolation: a single failure must not discard the
+  // entire list (e.g. fork PR with deleted branch, transient 5xx, etc.).
+  for (const pr of tipPrs) {
+    try {
       const filesRes = await fetch(
         `https://api.github.com/repos/tempoxyz/tempo/pulls/${pr.number}/files`,
         { headers: ghHeaders(token) },
@@ -128,7 +135,9 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
       )
       if (!tipFile) continue
 
-      const content = await raw(pr.head.ref, tipFile.filename, token)
+      // Fork PRs live on `<owner>/<repo>`, not `tempoxyz/tempo`.
+      const headRepo = pr.head.repo?.full_name ?? 'tempoxyz/tempo'
+      const content = await raw(headRepo, pr.head.ref, tipFile.filename, token)
       results.push(
         parseTipRow(
           content,
@@ -141,12 +150,12 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
           pr.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
         ),
       )
+    } catch (e) {
+      console.warn(`[sync] skipping PR #${pr.number}: ${(e as Error).message}`)
     }
-
-    return results
-  } catch {
-    return []
   }
+
+  return results
 }
 
 /** Fetch all TIPs (merged + open PRs) from GitHub. */
@@ -166,7 +175,7 @@ export async function fetchAllTips(token?: string): Promise<TipRow[]> {
     Promise.all(
       tipPaths.map(async (f) => {
         const [content, createdAt] = await Promise.all([
-          raw('main', f.path, token),
+          raw('tempoxyz/tempo', 'main', f.path, token),
           firstCommitDate(f.path, token),
         ])
         return parseTipRow(content, f.path.replace('tips/', ''), '', createdAt)
