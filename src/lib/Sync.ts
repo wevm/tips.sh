@@ -37,6 +37,22 @@ async function firstCommitDate(path: string, token?: string): Promise<string> {
   return new Date().toISOString().slice(0, 10)
 }
 
+/** Cached creation date for a merged tip file. Once known, it doesn't change. */
+async function cachedFirstCommitDate(
+  path: string,
+  token: string | undefined,
+  kv?: KVNamespace,
+): Promise<string> {
+  if (!kv) return firstCommitDate(path, token)
+  const cacheKey = `tips:created_at:${path}`
+  const cached = await kv.get(cacheKey)
+  if (cached) return cached
+  const date = await firstCommitDate(path, token)
+  // Cache permanently; merged file creation dates don't change.
+  await kv.put(cacheKey, date)
+  return date
+}
+
 async function raw(
   repo: string,
   ref: string,
@@ -159,7 +175,7 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
 }
 
 /** Fetch all TIPs (merged + open PRs) from GitHub. */
-export async function fetchAllTips(token?: string): Promise<TipRow[]> {
+export async function fetchAllTips(token?: string, kv?: KVNamespace): Promise<TipRow[]> {
   const treeRes = await fetch(
     'https://api.github.com/repos/tempoxyz/tempo/git/trees/main?recursive=1',
     { headers: ghHeaders(token) },
@@ -176,7 +192,7 @@ export async function fetchAllTips(token?: string): Promise<TipRow[]> {
       tipPaths.map(async (f) => {
         const [content, createdAt] = await Promise.all([
           raw('tempoxyz/tempo', 'main', f.path, token),
-          firstCommitDate(f.path, token),
+          cachedFirstCommitDate(f.path, token, kv),
         ])
         return parseTipRow(content, f.path.replace('tips/', ''), '', createdAt)
       }),
@@ -211,7 +227,7 @@ export async function trySync(): Promise<boolean> {
   await kv.put('tips:syncing', '1', { expirationTtl: 120 })
   try {
     const token = (env as unknown as Record<string, unknown>).GITHUB_TOKEN as string | undefined
-    const allTips = await fetchAllTips(token)
+    const allTips = await fetchAllTips(token, kv)
     await writeToD1(env.DB, allTips)
   } finally {
     await kv.delete('tips:syncing')

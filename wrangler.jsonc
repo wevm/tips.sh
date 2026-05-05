@@ -28,7 +28,7 @@
     "remote": true,
   },
   "triggers": {
-    "crons": ["* * * * *"],
+    "crons": ["*/5 * * * *"],
   },
   "workers_dev": false,
   "routes": [
