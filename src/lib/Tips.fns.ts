@@ -76,7 +76,7 @@ export const get = createServerFn({ method: 'POST' })
     const contentHash = await sha256(row.content)
     // Bump suffix when the markdown renderer output changes (e.g., new
     // heading anchors) so cached HTML is invalidated.
-    const cacheKey = `tip:html:${row.number}:${contentHash}:v2`
+    const cacheKey = `tip:html:${row.number}:${contentHash}:v3`
     const kvStore = await kv()
 
     let html = await kvStore.get(cacheKey)

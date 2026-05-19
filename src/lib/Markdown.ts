@@ -55,6 +55,18 @@ function rehypeShiki() {
       const lang = className?.replace('language-', '') ?? 'text'
       const code = (codeEl.children[0] as Text)?.value ?? ''
 
+      if (lang.toLowerCase() === 'mermaid') {
+        if (parent && typeof index === 'number') {
+          ;(parent.children as unknown[])[index] = {
+            type: 'element',
+            tagName: 'pre',
+            properties: { className: ['mermaid'] },
+            children: [{ type: 'text', value: code }],
+          }
+        }
+        return
+      }
+
       const loadedLangs = highlighter.getLoadedLanguages()
       const resolvedLang = loadedLangs.includes(lang) ? lang : 'text'
 

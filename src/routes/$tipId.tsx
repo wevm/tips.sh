@@ -2,6 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import * as Config from '#/lib/Config'
 import { Highlights } from '#/lib/Highlights'
+import { Mermaid } from '#/lib/Mermaid'
 import * as Tips from '#/lib/Tips.fns'
 
 export const Route = createFileRoute('/$tipId')({
@@ -126,6 +127,7 @@ function TipPage() {
       </main>
       <TableOfContents headings={headings} />
       <Highlights targetSelector=".tip-body" />
+      <Mermaid targetSelector=".tip-body" />
     </div>
   )
 }
