@@ -4,6 +4,8 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type { Result } from './Search'
 
+type DbResult = Omit<Result, 'pr'> & { pr_json: string }
+
 /** Search TIPs with FTS5, supporting exact number shortcuts and prefix matching. */
 export const query = createServerFn({ method: 'POST' })
   .inputValidator(z.string())
@@ -18,9 +20,15 @@ export const query = createServerFn({ method: 'POST' })
     const numMatch = trimmed.match(/^(?:tip-?)?(\d+)$/i)
     if (numMatch) {
       const row = await db
-        .prepare('SELECT number, title, authors, status FROM tips WHERE number = ?')
+        .prepare('SELECT number, title, authors, status, pr_json FROM tips WHERE number = ?')
         .bind(numMatch[1])
-        .first<{ number: string; title: string; authors: string; status: string }>()
+        .first<{
+          number: string
+          title: string
+          authors: string
+          status: string
+          pr_json: string
+        }>()
       if (row)
         return [
           {
@@ -30,6 +38,7 @@ export const query = createServerFn({ method: 'POST' })
             status: row.status,
             snippet: '',
             rank: 0,
+            pr: row.pr_json ? JSON.parse(row.pr_json) : undefined,
           },
         ] as Result[]
     }
@@ -46,7 +55,7 @@ export const query = createServerFn({ method: 'POST' })
     const [titleRows, allRows] = await Promise.all([
       db
         .prepare(
-          `SELECT t.number, t.title, t.authors, t.status,
+          `SELECT t.number, t.title, t.authors, t.status, t.pr_json,
                   snippet(tips_fts, 1, '<mark>', '</mark>', '…', 32) as snippet,
                   bm25(tips_fts, 10, 50, 3, 5, 1) as rank
            FROM tips_fts
@@ -56,10 +65,10 @@ export const query = createServerFn({ method: 'POST' })
            LIMIT 10`,
         )
         .bind(titleQuery)
-        .all<Result>(),
+        .all<DbResult>(),
       db
         .prepare(
-          `SELECT t.number, t.title, t.authors, t.status,
+          `SELECT t.number, t.title, t.authors, t.status, t.pr_json,
                   COALESCE(
                     NULLIF(snippet(tips_fts, 4, '<mark>', '</mark>', '…', 32), ''),
                     NULLIF(snippet(tips_fts, 3, '<mark>', '</mark>', '…', 32), ''),
@@ -73,13 +82,18 @@ export const query = createServerFn({ method: 'POST' })
            LIMIT 20`,
         )
         .bind(ftsQuery)
-        .all<Result>(),
+        .all<DbResult>(),
     ])
 
     // Merge: title matches first, then remaining general matches
     const seen = new Set(titleRows.results.map((r) => r.number))
-    return [
-      ...titleRows.results,
-      ...allRows.results.filter((r) => !seen.has(r.number)),
-    ].slice(0, 20)
+    return [...titleRows.results, ...allRows.results.filter((r) => !seen.has(r.number))]
+      .slice(0, 20)
+      .map((r) => {
+        const { pr_json, ...result } = r
+        return {
+          ...result,
+          pr: pr_json ? JSON.parse(pr_json) : undefined,
+        }
+      })
   })
