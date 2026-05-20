@@ -5,6 +5,7 @@ import * as Tips from '#/lib/Tips.fns'
 import * as Search from '#/lib/Search.fns'
 import * as Config from '#/lib/Config'
 import type * as SearchTypes from '#/lib/Search'
+import type * as TipTypes from '#/lib/Tips'
 
 export const Route = createFileRoute('/')({
   loader: () => Tips.list(),
@@ -84,6 +85,38 @@ function StatusBadge({ status, isPr }: { status: string; isPr?: boolean }) {
   )
 }
 
+function displayStatus(tip: Pick<TipTypes.Summary, 'status' | 'pr'>) {
+  return tip.pr ? 'Proposed' : tip.status
+}
+
+function statusKey(status: string) {
+  return status.toLowerCase().replace(/\s+/g, '-')
+}
+
+function StatusFilter({
+  value,
+  statuses,
+  onChange,
+}: {
+  value: string
+  statuses: string[]
+  onChange: (v: string) => void
+}) {
+  return (
+    <label className="tip-status-filter">
+      <span>Status</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">All</option>
+        {statuses.map((status) => (
+          <option key={statusKey(status)} value={statusKey(status)}>
+            {status}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 function SearchBox({
   value,
   onChange,
@@ -148,7 +181,13 @@ function SearchBox({
   )
 }
 
-function SearchResults({ results, activeIndex }: { results: SearchTypes.Result[]; activeIndex: number }) {
+function SearchResults({
+  results,
+  activeIndex,
+}: {
+  results: SearchTypes.Result[]
+  activeIndex: number
+}) {
   if (results.length === 0)
     return <p style={{ color: 'var(--color-text-muted)', marginTop: '1.5em' }}>No results found.</p>
 
@@ -196,7 +235,7 @@ function SearchResults({ results, activeIndex }: { results: SearchTypes.Result[]
             </span>
             <span style={{ fontWeight: 700, minWidth: 0 }}>{r.title}</span>
             <span style={{ marginLeft: 'auto', flexShrink: 0 }}>
-              <StatusBadge status={r.status} />
+              <StatusBadge status={r.status} isPr={!!r.pr} />
             </span>
           </div>
           {r.snippet && (
@@ -220,6 +259,7 @@ function SearchResults({ results, activeIndex }: { results: SearchTypes.Result[]
 function TipsIndex() {
   const tips = Route.useLoaderData()
   const [query, setQuery] = useQueryState('q', parseAsString.withDefault(''))
+  const [status, setStatus] = useQueryState('status', parseAsString.withDefault(''))
   const [results, setResults] = useState<SearchTypes.Result[] | null>(null)
   const [searching, setSearching] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -227,6 +267,15 @@ function TipsIndex() {
   const navigate = Route.useNavigate()
 
   const isSearching = query.length > 0
+  const statuses = Array.from(new Set(tips.map(displayStatus))).sort((a, b) => a.localeCompare(b))
+  const visibleTips = status ? tips.filter((tip) => statusKey(displayStatus(tip)) === status) : tips
+  const visibleResults = status
+    ? (results?.filter((result) => statusKey(displayStatus(result)) === status) ?? null)
+    : results
+
+  useEffect(() => {
+    setActiveIndex(-1)
+  }, [status])
 
   useEffect(() => {
     if (!query.trim()) {
@@ -264,28 +313,31 @@ function TipsIndex() {
       </div>
 
       <div className="tip-body">
-        <SearchBox
-          value={query}
-          onChange={setQuery}
-          onArrow={(dir) => {
-            if (!results?.length) return
-            setActiveIndex((prev) => {
-              if (dir === 'down') return prev < results.length - 1 ? prev + 1 : 0
-              return prev > 0 ? prev - 1 : results.length - 1
-            })
-          }}
-          onCommit={() => {
-            if (results && activeIndex >= 0 && activeIndex < results.length) {
-              navigate({
-                to: '/$tipId',
-                params: { tipId: results[activeIndex].number },
+        <div className="tip-index-controls">
+          <SearchBox
+            value={query}
+            onChange={setQuery}
+            onArrow={(dir) => {
+              if (!visibleResults?.length) return
+              setActiveIndex((prev) => {
+                if (dir === 'down') return prev < visibleResults.length - 1 ? prev + 1 : 0
+                return prev > 0 ? prev - 1 : visibleResults.length - 1
               })
-            }
-          }}
-        />
+            }}
+            onCommit={() => {
+              if (visibleResults && activeIndex >= 0 && activeIndex < visibleResults.length) {
+                navigate({
+                  to: '/$tipId',
+                  params: { tipId: visibleResults[activeIndex].number },
+                })
+              }
+            }}
+          />
+          <StatusFilter value={status} statuses={statuses} onChange={setStatus} />
+        </div>
 
         {isSearching ? (
-          searching && !results ? (
+          searching && !visibleResults ? (
             <p
               style={{
                 color: 'var(--color-text-muted)',
@@ -295,47 +347,47 @@ function TipsIndex() {
               Searching…
             </p>
           ) : (
-            results && <SearchResults results={results} activeIndex={activeIndex} />
+            visibleResults && <SearchResults results={visibleResults} activeIndex={activeIndex} />
           )
         ) : (
           <div style={{ overflowX: 'auto' }}>
-          <table style={{ marginTop: '0.5em' }}>
-            <caption className="sr-only">List of Tempo Improvement Proposals</caption>
-            <thead>
-              <tr>
-                <th style={{ width: '5rem' }}>Number</th>
-                <th>Title</th>
-                <th style={{ width: '7rem', textAlign: 'right' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tips.map((tip) => (
-                <tr key={tip.number}>
-                  <td>
-                    <Link
-                      to="/$tipId"
-                      params={{ tipId: tip.number }}
-                      style={{ fontFamily: 'var(--font-serif)' }}
-                    >
-                      <TipNumber value={tip.number} prUrl={tip.pr?.url} />
-                    </Link>
-                  </td>
-                  <td>
-                    <Link
-                      to="/$tipId"
-                      params={{ tipId: tip.number }}
-                      style={{ textDecoration: 'none', color: 'inherit' }}
-                    >
-                      {tip.title}
-                    </Link>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <StatusBadge status={tip.status} isPr={!!tip.pr} />
-                  </td>
+            <table style={{ marginTop: '0.5em' }}>
+              <caption className="sr-only">List of Tempo Improvement Proposals</caption>
+              <thead>
+                <tr>
+                  <th style={{ width: '5rem' }}>Number</th>
+                  <th>Title</th>
+                  <th style={{ width: '7rem', textAlign: 'right' }}>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visibleTips.map((tip) => (
+                  <tr key={tip.number}>
+                    <td>
+                      <Link
+                        to="/$tipId"
+                        params={{ tipId: tip.number }}
+                        style={{ fontFamily: 'var(--font-serif)' }}
+                      >
+                        <TipNumber value={tip.number} prUrl={tip.pr?.url} />
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        to="/$tipId"
+                        params={{ tipId: tip.number }}
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                      >
+                        {tip.title}
+                      </Link>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <StatusBadge status={tip.status} isPr={!!tip.pr} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
