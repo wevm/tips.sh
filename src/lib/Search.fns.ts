@@ -3,6 +3,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type { Result } from './Search'
+import { buildFtsSearchQuery, buildTitleFtsSearchQuery } from './SearchQuery'
 
 /** Search TIPs with FTS5, supporting exact number shortcuts and prefix matching. */
 export const query = createServerFn({ method: 'POST' })
@@ -34,15 +35,11 @@ export const query = createServerFn({ method: 'POST' })
         ] as Result[]
     }
 
-    // FTS5 query with prefix matching
-    const ftsQuery = trimmed
-      .split(/\s+/)
-      .filter((term) => term.length > 0)
-      .map((term) => term.replace(/"/g, '""') + '*')
-      .join(' ')
+    const ftsQuery = buildFtsSearchQuery(trimmed)
+    if (!ftsQuery) return [] as Result[]
 
     // Run two queries: title-scoped matches first, then general matches
-    const titleQuery = `title : ${ftsQuery}`
+    const titleQuery = buildTitleFtsSearchQuery(ftsQuery)
     const [titleRows, allRows] = await Promise.all([
       db
         .prepare(
@@ -78,8 +75,8 @@ export const query = createServerFn({ method: 'POST' })
 
     // Merge: title matches first, then remaining general matches
     const seen = new Set(titleRows.results.map((r) => r.number))
-    return [
-      ...titleRows.results,
-      ...allRows.results.filter((r) => !seen.has(r.number)),
-    ].slice(0, 20)
+    return [...titleRows.results, ...allRows.results.filter((r) => !seen.has(r.number))].slice(
+      0,
+      20,
+    )
   })
