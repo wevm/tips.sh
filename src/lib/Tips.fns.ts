@@ -1,6 +1,7 @@
 /** Server functions for reading TIPs from D1. */
 
 import { createServerFn } from '@tanstack/react-start'
+import { notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 import type { Summary, Detail } from './Tips'
 import * as Markdown from './Markdown'
@@ -71,7 +72,7 @@ export const get = createServerFn({ method: 'POST' })
         pr_json: string
         created_at: string
       }>()
-    if (!row) throw new Error(`TIP ${tipId} not found`)
+    if (!row) throw notFound()
 
     const contentHash = await sha256(row.content)
     // Bump suffix when the markdown renderer output changes (e.g., new
