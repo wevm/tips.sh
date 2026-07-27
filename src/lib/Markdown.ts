@@ -146,17 +146,18 @@ function codeToLatex(code: string): string {
       return `\\text{${w.replace(/_/g, '\\_')}}`
     })
     .replace(/×/g, ' \\times ')
+    .replace(/(\d+)\^(-?\d+)/g, '$1^{$2}')
     .replace(/(\d),(\d)/g, '$1{,}$2')
 }
 
 function preprocess(md: string): string {
   return md
     .replace(/(^|[^\\`])\$(\d)/gm, (_m, pre, digit) => `${pre}\\$${digit}`)
-    .replace(/`([^`]+)`/g, (_m, code) => {
-      if (isMathExpression(code)) return `$${codeToLatex(code)}$`
-      return _m
-    })
-    .replace(/(?<![`$])(\d+)\^(-?\d+)(?![}`])/g, (_, base, exp) => {
+    .replace(/`([^`]+)`|(?<![$\d])(\d+)\^(-?\d+)(?![\d}`])/g, (match, code, base, exp) => {
+      if (code !== undefined) {
+        if (isMathExpression(code)) return `$${codeToLatex(code)}$`
+        return match
+      }
       return `$${base}^{${exp}}$`
     })
 }
