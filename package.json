@@ -17,7 +17,7 @@
     "postinstall": "npm run gen:types",
     "prebuild": "node --import=tsx scripts/gen-robots.ts",
     "preview": "npm run build && vp preview",
-    "sync": "node --env-file=.env --import=tsx scripts/sync.ts",
+    "sync": "node --env-file-if-exists=.env --import=tsx scripts/sync.ts",
     "test": "vp test run"
   },
   "dependencies": {
