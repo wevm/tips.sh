@@ -1,4 +1,4 @@
-/** GitHub → D1 sync for TIPs. KV is only used for the sync lock. */
+/** GitHub → D1 sync for TIPs. KV stores the sync lock and GitHub metadata caches. */
 
 import * as Tips from './Tips'
 
@@ -14,7 +14,7 @@ function ghHeaders(token?: string): Record<string, string> {
 async function firstCommitDate(path: string, token?: string): Promise<string> {
   try {
     const res = await fetch(
-      `https://api.github.com/repos/tempoxyz/tempo/commits?path=${encodeURIComponent(path)}&per_page=1&page=1`,
+      `https://api.github.com/repos/tempoxyz/tempo/commits?path=${encodeURIComponent(path)}&per_page=100&page=1`,
       { headers: ghHeaders(token) },
     )
     if (!res.ok) return new Date().toISOString().slice(0, 10)
@@ -25,8 +25,11 @@ async function firstCommitDate(path: string, token?: string): Promise<string> {
       if (lastMatch) {
         const lastRes = await fetch(lastMatch[1], { headers: ghHeaders(token) })
         if (lastRes.ok) {
-          const commits = (await lastRes.json()) as Array<{ commit: { committer: { date: string } } }>
-          if (commits.length > 0) return commits[commits.length - 1].commit.committer.date.slice(0, 10)
+          const commits = (await lastRes.json()) as Array<{
+            commit: { committer: { date: string } }
+          }>
+          if (commits.length > 0)
+            return commits[commits.length - 1].commit.committer.date.slice(0, 10)
         }
       }
     }
@@ -53,12 +56,7 @@ async function cachedFirstCommitDate(
   return date
 }
 
-async function raw(
-  repo: string,
-  ref: string,
-  path: string,
-  token?: string,
-): Promise<string> {
+async function raw(repo: string, ref: string, path: string, token?: string): Promise<string> {
   const res = await fetch(`https://raw.githubusercontent.com/${repo}/${ref}/${path}`, {
     headers: ghHeaders(token),
   })
@@ -79,12 +77,14 @@ export type TipRow = {
   createdAt: string
 }
 
-function parseTipRow(
-  content: string,
-  filename: string,
-  prJson: string,
-  createdAt: string,
-): TipRow {
+type CachedPrTip = {
+  updatedAt: string
+  row: TipRow | null
+}
+
+const prCacheTtl = 7 * 24 * 60 * 60
+
+function parseTipRow(content: string, filename: string, prJson: string, createdAt: string): TipRow {
   const { number, title } = Tips.parseTitle(content)
   const pvMatch = content.match(/\*\*Protocol Version\*\*[:\s]*(.+)/i)
   return {
@@ -101,7 +101,7 @@ function parseTipRow(
   }
 }
 
-async function fetchPrTips(token?: string): Promise<TipRow[]> {
+async function fetchPrTips(token?: string, kv?: KVNamespace): Promise<TipRow[]> {
   // Paginate through all open PRs
   const allPrs: Array<{
     number: number
@@ -109,6 +109,7 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
     body: string | null
     html_url: string
     created_at: string
+    updated_at: string
     head: { ref: string; repo: { full_name: string } | null }
   }> = []
   let page = 1
@@ -133,6 +134,13 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
   // entire list (e.g. fork PR with deleted branch, transient 5xx, etc.).
   for (const pr of tipPrs) {
     try {
+      const cacheKey = `tips:pr:${pr.number}`
+      const cached = await kv?.get<CachedPrTip>(cacheKey, 'json')
+      if (cached?.updatedAt === pr.updated_at) {
+        if (cached.row) results.push(cached.row)
+        continue
+      }
+
       const filesRes = await fetch(
         `https://api.github.com/repos/tempoxyz/tempo/pulls/${pr.number}/files`,
         { headers: ghHeaders(token) },
@@ -149,23 +157,30 @@ async function fetchPrTips(token?: string): Promise<TipRow[]> {
           f.filename.endsWith('.md') &&
           (f.status === 'added' || f.status === 'modified'),
       )
-      if (!tipFile) continue
+      if (!tipFile) {
+        await kv?.put(cacheKey, JSON.stringify({ updatedAt: pr.updated_at, row: null }), {
+          expirationTtl: prCacheTtl,
+        })
+        continue
+      }
 
       // Fork PRs live on `<owner>/<repo>`, not `tempoxyz/tempo`.
       const headRepo = pr.head.repo?.full_name ?? 'tempoxyz/tempo'
       const content = await raw(headRepo, pr.head.ref, tipFile.filename, token)
-      results.push(
-        parseTipRow(
-          content,
-          tipFile.filename.replace('tips/', ''),
-          JSON.stringify({
-            number: pr.number,
-            url: pr.html_url,
-            branch: pr.head.ref,
-          }),
-          pr.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
-        ),
+      const row = parseTipRow(
+        content,
+        tipFile.filename.replace('tips/', ''),
+        JSON.stringify({
+          number: pr.number,
+          url: pr.html_url,
+          branch: pr.head.ref,
+        }),
+        pr.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
       )
+      results.push(row)
+      await kv?.put(cacheKey, JSON.stringify({ updatedAt: pr.updated_at, row }), {
+        expirationTtl: prCacheTtl,
+      })
     } catch (e) {
       console.warn(`[sync] skipping PR #${pr.number}: ${(e as Error).message}`)
     }
@@ -197,7 +212,7 @@ export async function fetchAllTips(token?: string, kv?: KVNamespace): Promise<Ti
         return parseTipRow(content, f.path.replace('tips/', ''), '', createdAt)
       }),
     ),
-    fetchPrTips(token),
+    fetchPrTips(token, kv),
   ])
 
   // Count how many times each number appears across merged + PR TIPs
