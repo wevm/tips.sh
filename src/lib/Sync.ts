@@ -11,11 +11,25 @@ function ghHeaders(token?: string): Record<string, string> {
   return h
 }
 
-async function firstCommitDate(path: string, token?: string): Promise<string> {
+type GithubFetch = (url: string) => Promise<Response>
+
+function createGithubFetch(token?: string): GithubFetch {
+  let activeToken = token
+  return async (url) => {
+    const requestToken = activeToken
+    const response = await fetch(url, { headers: ghHeaders(requestToken) })
+    if (response.status !== 401 || !requestToken) return response
+
+    activeToken = undefined
+    console.warn('[sync] GitHub token rejected; retrying public requests without authentication')
+    return fetch(url, { headers: ghHeaders() })
+  }
+}
+
+async function firstCommitDate(path: string, githubFetch: GithubFetch): Promise<string> {
   try {
-    const res = await fetch(
+    const res = await githubFetch(
       `https://api.github.com/repos/tempoxyz/tempo/commits?path=${encodeURIComponent(path)}&per_page=100&page=1`,
-      { headers: ghHeaders(token) },
     )
     if (!res.ok) return new Date().toISOString().slice(0, 10)
     // GitHub returns newest first by default; get the Link header for last page
@@ -23,7 +37,7 @@ async function firstCommitDate(path: string, token?: string): Promise<string> {
     if (link) {
       const lastMatch = link.match(/<([^>]+)>;\s*rel="last"/)
       if (lastMatch) {
-        const lastRes = await fetch(lastMatch[1], { headers: ghHeaders(token) })
+        const lastRes = await githubFetch(lastMatch[1])
         if (lastRes.ok) {
           const commits = (await lastRes.json()) as Array<{
             commit: { committer: { date: string } }
@@ -43,23 +57,21 @@ async function firstCommitDate(path: string, token?: string): Promise<string> {
 /** Cached creation date for a merged tip file. Once known, it doesn't change. */
 async function cachedFirstCommitDate(
   path: string,
-  token: string | undefined,
+  githubFetch: GithubFetch,
   kv?: KVNamespace,
 ): Promise<string> {
-  if (!kv) return firstCommitDate(path, token)
+  if (!kv) return firstCommitDate(path, githubFetch)
   const cacheKey = `tips:created_at:${path}`
   const cached = await kv.get(cacheKey)
   if (cached) return cached
-  const date = await firstCommitDate(path, token)
+  const date = await firstCommitDate(path, githubFetch)
   // Cache permanently; merged file creation dates don't change.
   await kv.put(cacheKey, date)
   return date
 }
 
-async function raw(repo: string, ref: string, path: string, token?: string): Promise<string> {
-  const res = await fetch(`https://raw.githubusercontent.com/${repo}/${ref}/${path}`, {
-    headers: ghHeaders(token),
-  })
+async function raw(repo: string, ref: string, path: string, githubFetch: GithubFetch) {
+  const res = await githubFetch(`https://raw.githubusercontent.com/${repo}/${ref}/${path}`)
   if (!res.ok) throw new Error(`Failed to fetch ${path}@${repo}/${ref}: ${res.status}`)
   return res.text()
 }
@@ -82,6 +94,19 @@ type CachedPrTip = {
   row: TipRow | null
 }
 
+type CachedMergedTip = {
+  sha: string
+  row: TipRow
+}
+
+type TipPath = {
+  path: string
+  sha: string
+}
+
+// A TIP can require raw content plus two commit-history pages. Keep enough
+// headroom for the tree request and one unauthenticated retry.
+const mergedCacheBatchSize = 15
 const prCacheTtl = 7 * 24 * 60 * 60
 
 function parseTipRow(content: string, filename: string, prJson: string, createdAt: string): TipRow {
@@ -101,7 +126,19 @@ function parseTipRow(content: string, filename: string, prJson: string, createdA
   }
 }
 
-async function fetchPrTips(token?: string, kv?: KVNamespace): Promise<TipRow[]> {
+async function fetchMergedTip(
+  tipPath: TipPath,
+  githubFetch: GithubFetch,
+  kv?: KVNamespace,
+): Promise<TipRow> {
+  const [content, createdAt] = await Promise.all([
+    raw('tempoxyz/tempo', 'main', tipPath.path, githubFetch),
+    cachedFirstCommitDate(tipPath.path, githubFetch, kv),
+  ])
+  return parseTipRow(content, tipPath.path.replace('tips/', ''), '', createdAt)
+}
+
+async function fetchPrTips(githubFetch: GithubFetch, kv?: KVNamespace): Promise<TipRow[]> {
   // Paginate through all open PRs
   const allPrs: Array<{
     number: number
@@ -114,9 +151,8 @@ async function fetchPrTips(token?: string, kv?: KVNamespace): Promise<TipRow[]> 
   }> = []
   let page = 1
   while (true) {
-    const res = await fetch(
+    const res = await githubFetch(
       `https://api.github.com/repos/tempoxyz/tempo/pulls?state=open&per_page=100&page=${page}`,
-      { headers: ghHeaders(token) },
     )
     if (!res.ok) break
     const prs = (await res.json()) as typeof allPrs
@@ -141,9 +177,8 @@ async function fetchPrTips(token?: string, kv?: KVNamespace): Promise<TipRow[]> 
         continue
       }
 
-      const filesRes = await fetch(
+      const filesRes = await githubFetch(
         `https://api.github.com/repos/tempoxyz/tempo/pulls/${pr.number}/files`,
-        { headers: ghHeaders(token) },
       )
       if (!filesRes.ok) continue
 
@@ -166,7 +201,7 @@ async function fetchPrTips(token?: string, kv?: KVNamespace): Promise<TipRow[]> 
 
       // Fork PRs live on `<owner>/<repo>`, not `tempoxyz/tempo`.
       const headRepo = pr.head.repo?.full_name ?? 'tempoxyz/tempo'
-      const content = await raw(headRepo, pr.head.ref, tipFile.filename, token)
+      const content = await raw(headRepo, pr.head.ref, tipFile.filename, githubFetch)
       const row = parseTipRow(
         content,
         tipFile.filename.replace('tips/', ''),
@@ -190,30 +225,52 @@ async function fetchPrTips(token?: string, kv?: KVNamespace): Promise<TipRow[]> 
 }
 
 /** Fetch all TIPs (merged + open PRs) from GitHub. */
-export async function fetchAllTips(token?: string, kv?: KVNamespace): Promise<TipRow[]> {
-  const treeRes = await fetch(
+export async function fetchAllTips(token?: string): Promise<TipRow[]>
+export async function fetchAllTips(
+  token: string | undefined,
+  kv: KVNamespace,
+): Promise<TipRow[] | undefined>
+export async function fetchAllTips(
+  token?: string,
+  kv?: KVNamespace,
+): Promise<TipRow[] | undefined> {
+  const githubFetch = createGithubFetch(token)
+  const treeRes = await githubFetch(
     'https://api.github.com/repos/tempoxyz/tempo/git/trees/main?recursive=1',
-    { headers: ghHeaders(token) },
   )
   if (!treeRes.ok) throw new Error(`GitHub API error: ${treeRes.status}`)
 
   const tree = (await treeRes.json()) as {
-    tree: Array<{ path: string; type: string }>
+    tree: Array<{ path: string; type: string; sha: string }>
   }
   const tipPaths = tree.tree.filter((f) => f.type === 'blob' && /^tips\/tip-\d+\.md$/.test(f.path))
 
-  const [mergedDetails, prTips] = await Promise.all([
-    Promise.all(
-      tipPaths.map(async (f) => {
-        const [content, createdAt] = await Promise.all([
-          raw('tempoxyz/tempo', 'main', f.path, token),
-          cachedFirstCommitDate(f.path, token, kv),
-        ])
-        return parseTipRow(content, f.path.replace('tips/', ''), '', createdAt)
-      }),
-    ),
-    fetchPrTips(token, kv),
-  ])
+  let mergedDetails: TipRow[]
+  if (kv) {
+    const cachedTips = await Promise.all(
+      tipPaths.map(async (tipPath) => ({
+        tipPath,
+        cached: await kv.get<CachedMergedTip>(`tips:merged:${tipPath.path}`, 'json'),
+      })),
+    )
+    const uncachedTips = cachedTips.filter(({ tipPath, cached }) => cached?.sha !== tipPath.sha)
+    if (uncachedTips.length > 0) {
+      await Promise.all(
+        uncachedTips.slice(0, mergedCacheBatchSize).map(async ({ tipPath }) => {
+          const row = await fetchMergedTip(tipPath, githubFetch, kv)
+          await kv.put(`tips:merged:${tipPath.path}`, JSON.stringify({ sha: tipPath.sha, row }))
+        }),
+      )
+      return
+    }
+    mergedDetails = cachedTips.map(({ cached }) => cached!.row)
+  } else {
+    mergedDetails = await Promise.all(
+      tipPaths.map((tipPath) => fetchMergedTip(tipPath, githubFetch)),
+    )
+  }
+
+  const prTips = await fetchPrTips(githubFetch, kv)
 
   // Count how many times each number appears across merged + PR TIPs
   const countByNumber = new Map<string, number>()
@@ -243,7 +300,7 @@ export async function trySync(): Promise<boolean> {
   try {
     const token = (env as unknown as Record<string, unknown>).GITHUB_TOKEN as string | undefined
     const allTips = await fetchAllTips(token, kv)
-    await writeToD1(env.DB, allTips)
+    if (allTips) await writeToD1(env.DB, allTips)
   } finally {
     await kv.delete('tips:syncing')
   }
