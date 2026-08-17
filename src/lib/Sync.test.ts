@@ -24,7 +24,7 @@ function json(value: unknown) {
 }
 
 describe('fetchAllTips', () => {
-  it('reuses cached PR inspections until a PR changes', async () => {
+  it('paginates and reuses cached PR inspections until a PR changes', async () => {
     const originalFetch = globalThis.fetch
     const cache = new Map<string, string>()
     const apiRequests: Array<{ url: string; authorization: string | null }> = []
@@ -75,10 +75,19 @@ describe('fetchAllTips', () => {
           },
         ])
       }
-      if (url.endsWith('/pulls/1/files')) {
+      if (url.includes('/pulls/1/files?')) {
+        const page = Number(new URL(url).searchParams.get('page'))
+        if (page < 5) {
+          return json(
+            Array.from({ length: 10 }, (_, index) => ({
+              filename: `crates/example-${page}-${index}.rs`,
+              status: 'modified',
+            })),
+          )
+        }
         return json([{ filename: 'tips/tip-1001.md', status: 'added' }])
       }
-      if (url.endsWith('/pulls/2/files')) {
+      if (url.includes('/pulls/2/files?')) {
         return json([{ filename: 'crates/consensus/src/tip.rs', status: 'modified' }])
       }
       if (url.includes('/tempoxyz/tempo/main/tips/tip-1000.md')) {
@@ -96,12 +105,17 @@ describe('fetchAllTips', () => {
       expect(apiRequests).toHaveLength(3)
       expect(apiRequests[0].authorization).toBe('Bearer expired-token')
       expect(apiRequests[1].authorization).toBeNull()
-      expect(apiRequests.some(({ url }) => url.includes('per_page=100'))).toBe(true)
+      expect(apiRequests.some(({ url }) => url.includes('per_page=10'))).toBe(true)
 
+      cache.set('tips:pr:1', JSON.stringify({ updatedAt: proposedTipUpdatedAt, row: null }))
       apiRequests.length = 0
       const second = await fetchAllTips('expired-token', kv)
       expect(second?.map((tip) => tip.number)).toEqual(['1000', '1001'])
-      expect(apiRequests).toHaveLength(5)
+      expect(apiRequests).toHaveLength(9)
+      expect(apiRequests.some(({ url }) => url.includes('/pulls/1/files?per_page=10&page=5'))).toBe(
+        true,
+      )
+      expect(cache.has('tips:pr:v2:1')).toBe(true)
 
       apiRequests.length = 0
       const unchanged = await fetchAllTips('expired-token', kv)
@@ -115,9 +129,9 @@ describe('fetchAllTips', () => {
       proposedTipUpdatedAt = '2026-08-02T00:00:00Z'
       const third = await fetchAllTips('expired-token', kv)
       expect(third?.map((tip) => tip.number)).toEqual(['1000', '1001'])
-      expect(apiRequests).toHaveLength(4)
-      expect(apiRequests.some(({ url }) => url.endsWith('/pulls/1/files'))).toBe(true)
-      expect(apiRequests.some(({ url }) => url.endsWith('/pulls/2/files'))).toBe(false)
+      expect(apiRequests).toHaveLength(8)
+      expect(apiRequests.some(({ url }) => url.includes('/pulls/1/files?'))).toBe(true)
+      expect(apiRequests.some(({ url }) => url.includes('/pulls/2/files?'))).toBe(false)
     } finally {
       globalThis.fetch = originalFetch
     }
