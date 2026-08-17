@@ -104,10 +104,18 @@ type TipPath = {
   sha: string
 }
 
+type PullRequestFile = {
+  filename: string
+  status: string
+}
+
 // A TIP can require raw content plus two commit-history pages. Keep enough
 // headroom for the tree request and one unauthenticated retry.
 const mergedCacheBatchSize = 15
 const prCacheTtl = 7 * 24 * 60 * 60
+const prFilesPageSize = 10
+// Bump when PR discovery changes so cached misses are re-evaluated.
+const prCacheVersion = 2
 
 function parseTipRow(content: string, filename: string, prJson: string, createdAt: string): TipRow {
   const { number, title } = Tips.parseTitle(content)
@@ -136,6 +144,29 @@ async function fetchMergedTip(
     cachedFirstCommitDate(tipPath.path, githubFetch, kv),
   ])
   return parseTipRow(content, tipPath.path.replace('tips/', ''), '', createdAt)
+}
+
+async function fetchPrTipFile(
+  prNumber: number,
+  githubFetch: GithubFetch,
+): Promise<PullRequestFile | undefined> {
+  let page = 1
+  while (true) {
+    const response = await githubFetch(
+      `https://api.github.com/repos/tempoxyz/tempo/pulls/${prNumber}/files?per_page=${prFilesPageSize}&page=${page}`,
+    )
+    if (!response.ok) throw new Error(`GitHub PR files API error: ${response.status}`)
+
+    const files = (await response.json()) as PullRequestFile[]
+    const tipFile = files.find(
+      (file) =>
+        file.filename.startsWith('tips/tip-') &&
+        file.filename.endsWith('.md') &&
+        (file.status === 'added' || file.status === 'modified'),
+    )
+    if (tipFile || files.length < prFilesPageSize) return tipFile
+    page++
+  }
 }
 
 async function fetchPrTips(githubFetch: GithubFetch, kv?: KVNamespace): Promise<TipRow[]> {
@@ -170,28 +201,14 @@ async function fetchPrTips(githubFetch: GithubFetch, kv?: KVNamespace): Promise<
   // entire list (e.g. fork PR with deleted branch, transient 5xx, etc.).
   for (const pr of tipPrs) {
     try {
-      const cacheKey = `tips:pr:${pr.number}`
+      const cacheKey = `tips:pr:v${prCacheVersion}:${pr.number}`
       const cached = await kv?.get<CachedPrTip>(cacheKey, 'json')
       if (cached?.updatedAt === pr.updated_at) {
         if (cached.row) results.push(cached.row)
         continue
       }
 
-      const filesRes = await githubFetch(
-        `https://api.github.com/repos/tempoxyz/tempo/pulls/${pr.number}/files`,
-      )
-      if (!filesRes.ok) continue
-
-      const files = (await filesRes.json()) as Array<{
-        filename: string
-        status: string
-      }>
-      const tipFile = files.find(
-        (f) =>
-          f.filename.startsWith('tips/tip-') &&
-          f.filename.endsWith('.md') &&
-          (f.status === 'added' || f.status === 'modified'),
-      )
+      const tipFile = await fetchPrTipFile(pr.number, githubFetch)
       if (!tipFile) {
         await kv?.put(cacheKey, JSON.stringify({ updatedAt: pr.updated_at, row: null }), {
           expirationTtl: prCacheTtl,
