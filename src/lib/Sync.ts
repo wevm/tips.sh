@@ -294,11 +294,21 @@ export async function fetchAllTips(
   for (const d of mergedDetails) countByNumber.set(d.number, (countByNumber.get(d.number) ?? 0) + 1)
   for (const d of prTips) countByNumber.set(d.number, (countByNumber.get(d.number) ?? 0) + 1)
 
-  // Append #N suffix only when a number has duplicates
+  const mergedNumbers = new Set(mergedDetails.map((d) => d.number))
+  const oldestPrByNumber = new Map<string, number>()
+  for (const d of prTips) {
+    const prNumber = (JSON.parse(d.prJson) as { number: number }).number
+    const oldestPr = oldestPrByNumber.get(d.number)
+    if (oldestPr === undefined || prNumber < oldestPr) oldestPrByNumber.set(d.number, prNumber)
+  }
+
+  // Keep the oldest proposal at the canonical number until a TIP is merged.
   const seenByBase = new Map<string, number>()
   const prTipsResolved = prTips.map((d) => {
     const total = countByNumber.get(d.number) ?? 1
     if (total <= 1) return d
+    const prNumber = (JSON.parse(d.prJson) as { number: number }).number
+    if (!mergedNumbers.has(d.number) && prNumber === oldestPrByNumber.get(d.number)) return d
     const idx = (seenByBase.get(d.number) ?? 0) + 1
     seenByBase.set(d.number, idx)
     return { ...d, number: `${d.number}-${idx}` }

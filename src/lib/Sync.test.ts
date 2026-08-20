@@ -210,4 +210,53 @@ describe('fetchAllTips', () => {
       globalThis.fetch = originalFetch
     }
   })
+
+  it('keeps the oldest duplicate proposal at the canonical number', async () => {
+    const originalFetch = globalThis.fetch
+
+    globalThis.fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+
+      if (url.includes('/git/trees/main?recursive=1')) return json({ tree: [] })
+      if (url.includes('/pulls?')) {
+        return json([
+          {
+            number: 7242,
+            title: 'docs(tip-1061): newer proposal',
+            body: null,
+            html_url: 'https://github.com/tempoxyz/tempo/pull/7242',
+            created_at: '2026-08-19T00:00:00Z',
+            updated_at: '2026-08-19T00:00:00Z',
+            head: { ref: 'tip-1061-docs', repo: { full_name: 'tempoxyz/tempo' } },
+          },
+          {
+            number: 4069,
+            title: 'feat(tip-1061): original proposal',
+            body: null,
+            html_url: 'https://github.com/tempoxyz/tempo/pull/4069',
+            created_at: '2026-03-01T00:00:00Z',
+            updated_at: '2026-08-19T00:00:00Z',
+            head: { ref: 'tip/1061', repo: { full_name: 'tempoxyz/tempo' } },
+          },
+        ])
+      }
+      if (url.includes('/pulls/7242/files?') || url.includes('/pulls/4069/files?')) {
+        return json([{ filename: 'tips/tip-1061.md', status: 'added' }])
+      }
+      if (url.startsWith('https://raw.githubusercontent.com/')) {
+        return new Response('# TIP-1061: Configurable Accounts\n')
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }
+
+    try {
+      const tips = await fetchAllTips()
+      expect(tips.map((tip) => [tip.number, JSON.parse(tip.prJson).number])).toEqual([
+        ['1061-1', 7242],
+        ['1061', 4069],
+      ])
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
 })
