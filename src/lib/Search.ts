@@ -1,4 +1,6 @@
 /** Search result from FTS5 query. */
+import type { PrInfo } from './Tips'
+
 export type Result = {
   number: string
   title: string
@@ -6,4 +8,5 @@ export type Result = {
   status: string
   snippet: string
   rank: number
+  pr?: PrInfo | undefined
 }
