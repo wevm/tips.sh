@@ -115,7 +115,7 @@ describe('fetchAllTips', () => {
       expect(apiRequests.some(({ url }) => url.includes('/pulls/1/files?per_page=10&page=5'))).toBe(
         true,
       )
-      expect(cache.has('tips:pr:v2:1')).toBe(true)
+      expect(cache.has('tips:pr:v3:1')).toBe(true)
 
       apiRequests.length = 0
       const unchanged = await fetchAllTips('expired-token', kv)
@@ -132,6 +132,78 @@ describe('fetchAllTips', () => {
       expect(apiRequests).toHaveLength(8)
       expect(apiRequests.some(({ url }) => url.includes('/pulls/1/files?'))).toBe(true)
       expect(apiRequests.some(({ url }) => url.includes('/pulls/2/files?'))).toBe(false)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('imports every TIP across PR file pages and refreshes single-TIP caches', async () => {
+    const originalFetch = globalThis.fetch
+    const updatedAt = '2026-09-17T00:00:00Z'
+    const cache = new Map<string, string>([
+      ['tips:pr:v2:7510', JSON.stringify({ updatedAt, row: { number: '1107' } })],
+    ])
+    const kv = {
+      async get(key: string, type?: string) {
+        const value = cache.get(key)
+        return value ? (type === 'json' ? JSON.parse(value) : value) : null
+      },
+      async put(key: string, value: string) {
+        cache.set(key, value)
+      },
+    } as unknown as KVNamespace
+    const requests: string[] = []
+    globalThis.fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      requests.push(url)
+      if (url.includes('/git/trees/')) return json({ tree: [] })
+      if (url.includes('/pulls?'))
+        return json([
+          {
+            number: 7510,
+            title: 'docs: configurable account TIPs',
+            body: null,
+            html_url: 'https://github.com/tempoxyz/tempo/pull/7510',
+            created_at: updatedAt,
+            updated_at: updatedAt,
+            head: { ref: 'tip-cluster', repo: { full_name: 'contributor/tempo' } },
+          },
+        ])
+      if (url.includes('/files?')) {
+        const page = new URL(url).searchParams.get('page')
+        return json(
+          page === '1'
+            ? [
+                { filename: 'tips/tip-1107.md', status: 'added' },
+                { filename: 'tips/tip-1108.md', status: 'modified' },
+                ...Array.from({ length: 8 }, (_, i) => ({
+                  filename: `src/${i}.rs`,
+                  status: 'modified',
+                })),
+              ]
+            : [
+                { filename: 'tips/tip-1109.md', status: 'added' },
+                { filename: 'tips/tip-1000.md', status: 'removed' },
+              ],
+        )
+      }
+      if (url.startsWith('https://raw.githubusercontent.com/contributor/tempo/tip-cluster/')) {
+        const number = url.match(/tip-(\d+)\.md$/)?.[1]
+        return new Response(`# TIP-${number}: Account component\n`)
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }
+    try {
+      const tips = await fetchAllTips(undefined, kv)
+      expect(tips?.map((tip) => tip.number)).toEqual(['1107', '1108', '1109'])
+      expect(tips?.map((tip) => JSON.parse(tip.prJson).number)).toEqual([7510, 7510, 7510])
+      expect(JSON.parse(cache.get('tips:pr:v3:7510')!).rows).toHaveLength(3)
+      requests.length = 0
+      expect(await fetchAllTips(undefined, kv)).toEqual(tips)
+      expect(requests).toHaveLength(2)
+      expect(
+        requests.some((url) => url.includes('/files?') || url.includes('raw.githubusercontent')),
+      ).toBe(false)
     } finally {
       globalThis.fetch = originalFetch
     }

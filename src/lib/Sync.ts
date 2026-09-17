@@ -89,9 +89,9 @@ export type TipRow = {
   createdAt: string
 }
 
-type CachedPrTip = {
+type CachedPrTips = {
   updatedAt: string
-  row: TipRow | null
+  rows: TipRow[]
 }
 
 type CachedMergedTip = {
@@ -115,7 +115,7 @@ const mergedCacheBatchSize = 15
 const prCacheTtl = 7 * 24 * 60 * 60
 const prFilesPageSize = 10
 // Bump when PR discovery changes so cached misses are re-evaluated.
-const prCacheVersion = 2
+const prCacheVersion = 3
 
 function parseTipRow(content: string, filename: string, prJson: string, createdAt: string): TipRow {
   const { number, title } = Tips.parseTitle(content)
@@ -146,10 +146,11 @@ async function fetchMergedTip(
   return parseTipRow(content, tipPath.path.replace('tips/', ''), '', createdAt)
 }
 
-async function fetchPrTipFile(
+async function fetchPrTipFiles(
   prNumber: number,
   githubFetch: GithubFetch,
-): Promise<PullRequestFile | undefined> {
+): Promise<PullRequestFile[]> {
+  const tipFiles: PullRequestFile[] = []
   let page = 1
   while (true) {
     const response = await githubFetch(
@@ -158,13 +159,15 @@ async function fetchPrTipFile(
     if (!response.ok) throw new Error(`GitHub PR files API error: ${response.status}`)
 
     const files = (await response.json()) as PullRequestFile[]
-    const tipFile = files.find(
-      (file) =>
-        file.filename.startsWith('tips/tip-') &&
-        file.filename.endsWith('.md') &&
-        (file.status === 'added' || file.status === 'modified'),
+    tipFiles.push(
+      ...files.filter(
+        (file) =>
+          file.filename.startsWith('tips/tip-') &&
+          file.filename.endsWith('.md') &&
+          (file.status === 'added' || file.status === 'modified'),
+      ),
     )
-    if (tipFile || files.length < prFilesPageSize) return tipFile
+    if (files.length < prFilesPageSize) return tipFiles
     page++
   }
 }
@@ -202,35 +205,33 @@ async function fetchPrTips(githubFetch: GithubFetch, kv?: KVNamespace): Promise<
   for (const pr of tipPrs) {
     try {
       const cacheKey = `tips:pr:v${prCacheVersion}:${pr.number}`
-      const cached = await kv?.get<CachedPrTip>(cacheKey, 'json')
+      const cached = await kv?.get<CachedPrTips>(cacheKey, 'json')
       if (cached?.updatedAt === pr.updated_at) {
-        if (cached.row) results.push(cached.row)
+        results.push(...cached.rows)
         continue
       }
 
-      const tipFile = await fetchPrTipFile(pr.number, githubFetch)
-      if (!tipFile) {
-        await kv?.put(cacheKey, JSON.stringify({ updatedAt: pr.updated_at, row: null }), {
-          expirationTtl: prCacheTtl,
-        })
-        continue
-      }
-
+      const tipFiles = await fetchPrTipFiles(pr.number, githubFetch)
       // Fork PRs live on `<owner>/<repo>`, not `tempoxyz/tempo`.
       const headRepo = pr.head.repo?.full_name ?? 'tempoxyz/tempo'
-      const content = await raw(headRepo, pr.head.ref, tipFile.filename, githubFetch)
-      const row = parseTipRow(
-        content,
-        tipFile.filename.replace('tips/', ''),
-        JSON.stringify({
-          number: pr.number,
-          url: pr.html_url,
-          branch: pr.head.ref,
-        }),
-        pr.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
-      )
-      results.push(row)
-      await kv?.put(cacheKey, JSON.stringify({ updatedAt: pr.updated_at, row }), {
+      const rows: TipRow[] = []
+      for (const tipFile of tipFiles) {
+        const content = await raw(headRepo, pr.head.ref, tipFile.filename, githubFetch)
+        rows.push(
+          parseTipRow(
+            content,
+            tipFile.filename.replace('tips/', ''),
+            JSON.stringify({
+              number: pr.number,
+              url: pr.html_url,
+              branch: pr.head.ref,
+            }),
+            pr.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+          ),
+        )
+      }
+      results.push(...rows)
+      await kv?.put(cacheKey, JSON.stringify({ updatedAt: pr.updated_at, rows }), {
         expirationTtl: prCacheTtl,
       })
     } catch (e) {
