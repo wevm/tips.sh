@@ -67,6 +67,12 @@ export const middleware = createMiddleware({ type: 'request' }).server(
     const url = new URL(request.url)
     const pathname = url.pathname
 
+    const tipFile = pathname.match(/^\/tip-(\d+)\.md$/)
+    if (tipFile) {
+      url.pathname = `/${tipFile[1]}`
+      throw Response.redirect(url.toString(), 308)
+    }
+
     // /:id.pdf → PDF response
     const pdfMatch = pathname.match(/^\/(\d+)\.pdf$/)
     if (pdfMatch) {

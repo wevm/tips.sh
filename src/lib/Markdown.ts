@@ -85,6 +85,19 @@ function rehypeShiki() {
   }
 }
 
+function rehypeTipLinks() {
+  return async (tree: import('hast').Root) => {
+    const { visit } = await import('unist-util-visit')
+    visit(tree, 'element', (node: Element) => {
+      if (node.tagName !== 'a' || typeof node.properties.href !== 'string') return
+      node.properties.href = node.properties.href.replace(
+        /^(?:\.\/|\/)?tip-(\d+)\.md(?=[?#]|$)/,
+        '/$1',
+      )
+    })
+  }
+}
+
 function rehypeHeadingIds() {
   return async (tree: import('hast').Root) => {
     const { visit } = await import('unist-util-visit')
@@ -175,6 +188,7 @@ export async function render(markdown: string): Promise<string> {
     .use(rehypeShiki)
     .use(rehypeHeadingIds)
     .use(rehypeRaw)
+    .use(rehypeTipLinks)
     .use(rehypeStringify)
     .process(processed)
 
