@@ -24,11 +24,12 @@ function json(value: unknown) {
 }
 
 describe('fetchAllTips', () => {
-  it('paginates and reuses cached PR inspections until a PR changes', async () => {
+  it('paginates and reuses cached PR inspections until its head changes', async () => {
     const originalFetch = globalThis.fetch
     const cache = new Map<string, string>()
     const apiRequests: Array<{ url: string; authorization: string | null }> = []
     let proposedTipUpdatedAt = '2026-08-01T00:00:00Z'
+    let proposedTipSha = 'proposed-sha-1'
 
     const kv = {
       async get(key: string, type?: string) {
@@ -62,7 +63,7 @@ describe('fetchAllTips', () => {
             html_url: 'https://github.com/tempoxyz/tempo/pull/1',
             created_at: '2026-08-01T00:00:00Z',
             updated_at: proposedTipUpdatedAt,
-            head: { ref: 'tip-1001', repo: { full_name: 'tempoxyz/tempo' } },
+            head: { ref: 'tip-1001', repo: { full_name: 'tempoxyz/tempo' }, sha: proposedTipSha },
           },
           {
             number: 2,
@@ -71,7 +72,7 @@ describe('fetchAllTips', () => {
             html_url: 'https://github.com/tempoxyz/tempo/pull/2',
             created_at: '2026-08-01T00:00:00Z',
             updated_at: '2026-08-01T00:00:00Z',
-            head: { ref: 'startup-tip', repo: { full_name: 'tempoxyz/tempo' } },
+            head: { ref: 'startup-tip', repo: { full_name: 'tempoxyz/tempo' }, sha: 'startup-sha' },
           },
         ])
       }
@@ -93,8 +94,10 @@ describe('fetchAllTips', () => {
       if (url.includes('/tempoxyz/tempo/main/tips/tip-1000.md')) {
         return new Response(mergedTip)
       }
-      if (url.includes('/tempoxyz/tempo/tip-1001/tips/tip-1001.md')) {
-        return new Response(proposedTip)
+      if (url.includes(`/tempoxyz/tempo/${proposedTipSha}/tips/tip-1001.md`)) {
+        return new Response(
+          proposedTipSha === 'proposed-sha-1' ? proposedTip : '# TIP-1001: Revised TIP\n',
+        )
       }
       throw new Error(`Unexpected request: ${url}`)
     }
@@ -115,7 +118,7 @@ describe('fetchAllTips', () => {
       expect(apiRequests.some(({ url }) => url.includes('/pulls/1/files?per_page=10&page=5'))).toBe(
         true,
       )
-      expect(cache.has('tips:pr:v3:1')).toBe(true)
+      expect(cache.has('tips:pr:v4:1')).toBe(true)
 
       apiRequests.length = 0
       const unchanged = await fetchAllTips('expired-token', kv)
@@ -127,11 +130,101 @@ describe('fetchAllTips', () => {
 
       apiRequests.length = 0
       proposedTipUpdatedAt = '2026-08-02T00:00:00Z'
+      expect(await fetchAllTips('expired-token', kv)).toEqual(unchanged)
+      expect(apiRequests).toHaveLength(3)
+
+      apiRequests.length = 0
+      proposedTipSha = 'proposed-sha-2'
       const third = await fetchAllTips('expired-token', kv)
       expect(third?.map((tip) => tip.number)).toEqual(['1000', '1001'])
+      expect(third?.find((tip) => tip.number === '1001')?.content).toBe('# TIP-1001: Revised TIP\n')
       expect(apiRequests).toHaveLength(8)
       expect(apiRequests.some(({ url }) => url.includes('/pulls/1/files?'))).toBe(true)
       expect(apiRequests.some(({ url }) => url.includes('/pulls/2/files?'))).toBe(false)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('retries failed commit fetches and replaces stale branch caches', async () => {
+    const originalFetch = globalThis.fetch
+    const updatedAt = '2026-10-06T04:31:05Z'
+    const oldContent = '# TIP-1134: Previous revision\n'
+    const latestContent = '# TIP-1134: Latest revision\n'
+    const cache = new Map<string, string>([
+      [
+        'tips:pr:v3:8141',
+        JSON.stringify({
+          updatedAt,
+          rows: [
+            {
+              abstract: '',
+              authors: '',
+              content: oldContent,
+              createdAt: '2026-10-06',
+              filename: 'tip-1134.md',
+              number: '1134',
+              prJson: JSON.stringify({ number: 8141 }),
+              protocolVersion: '',
+              status: 'Draft',
+              title: 'Previous revision',
+            },
+          ],
+        }),
+      ],
+    ])
+    const requests: string[] = []
+    let fail = true
+    const kv = {
+      async get(key: string, type?: string) {
+        const value = cache.get(key)
+        return value ? (type === 'json' ? JSON.parse(value) : value) : null
+      },
+      async put(key: string, value: string) {
+        cache.set(key, value)
+      },
+    } as unknown as KVNamespace
+
+    globalThis.fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      requests.push(url)
+      if (url.includes('/git/trees/')) return json({ tree: [] })
+      if (url.includes('/pulls?'))
+        return json([
+          {
+            number: 8141,
+            title: 'docs(tip-1134): key authorizations',
+            body: null,
+            html_url: 'https://github.com/tempoxyz/tempo/pull/8141',
+            created_at: updatedAt,
+            updated_at: updatedAt,
+            head: {
+              ref: 'tip/1134',
+              repo: { full_name: 'tempoxyz/tempo' },
+              sha: 'latest-head-sha',
+            },
+          },
+        ])
+      if (url.includes('/pulls/8141/files?'))
+        return json([{ filename: 'tips/tip-1134.md', status: 'added' }])
+      if (url === 'https://raw.githubusercontent.com/tempoxyz/tempo/tip/1134/tips/tip-1134.md')
+        return new Response(oldContent)
+      if (
+        url === 'https://raw.githubusercontent.com/tempoxyz/tempo/latest-head-sha/tips/tip-1134.md'
+      )
+        return fail ? new Response(null, { status: 503 }) : new Response(latestContent)
+      throw new Error(`Unexpected request: ${url}`)
+    }
+
+    try {
+      expect(await fetchAllTips(undefined, kv)).toEqual([])
+      expect(cache.has('tips:pr:v4:8141')).toBe(false)
+
+      fail = false
+      const tips = await fetchAllTips(undefined, kv)
+      expect(tips?.map((tip) => tip.content)).toEqual([latestContent])
+      expect(JSON.parse(cache.get('tips:pr:v4:8141')!).sha).toBe('latest-head-sha')
+      expect(requests.some((url) => url.includes('/tip/1134/'))).toBe(false)
     } finally {
       globalThis.fetch = originalFetch
     }
@@ -166,7 +259,11 @@ describe('fetchAllTips', () => {
             html_url: 'https://github.com/tempoxyz/tempo/pull/7510',
             created_at: updatedAt,
             updated_at: updatedAt,
-            head: { ref: 'tip-cluster', repo: { full_name: 'contributor/tempo' } },
+            head: {
+              ref: 'tip-cluster',
+              repo: { full_name: 'contributor/tempo' },
+              sha: 'fork-head-sha',
+            },
           },
         ])
       if (url.includes('/files?')) {
@@ -187,7 +284,7 @@ describe('fetchAllTips', () => {
               ],
         )
       }
-      if (url.startsWith('https://raw.githubusercontent.com/contributor/tempo/tip-cluster/')) {
+      if (url.startsWith('https://raw.githubusercontent.com/contributor/tempo/fork-head-sha/')) {
         const number = url.match(/tip-(\d+)\.md$/)?.[1]
         return new Response(`# TIP-${number}: Account component\n`)
       }
@@ -197,7 +294,7 @@ describe('fetchAllTips', () => {
       const tips = await fetchAllTips(undefined, kv)
       expect(tips?.map((tip) => tip.number)).toEqual(['1107', '1108', '1109'])
       expect(tips?.map((tip) => JSON.parse(tip.prJson).number)).toEqual([7510, 7510, 7510])
-      expect(JSON.parse(cache.get('tips:pr:v3:7510')!).rows).toHaveLength(3)
+      expect(JSON.parse(cache.get('tips:pr:v4:7510')!).rows).toHaveLength(3)
       requests.length = 0
       expect(await fetchAllTips(undefined, kv)).toEqual(tips)
       expect(requests).toHaveLength(2)
@@ -299,7 +396,7 @@ describe('fetchAllTips', () => {
             html_url: 'https://github.com/tempoxyz/tempo/pull/7242',
             created_at: '2026-08-19T00:00:00Z',
             updated_at: '2026-08-19T00:00:00Z',
-            head: { ref: 'tip-1061-docs', repo: { full_name: 'tempoxyz/tempo' } },
+            head: { ref: 'tip-1061-docs', repo: { full_name: 'tempoxyz/tempo' }, sha: 'newer-sha' },
           },
           {
             number: 4069,
@@ -308,7 +405,7 @@ describe('fetchAllTips', () => {
             html_url: 'https://github.com/tempoxyz/tempo/pull/4069',
             created_at: '2026-03-01T00:00:00Z',
             updated_at: '2026-08-19T00:00:00Z',
-            head: { ref: 'tip/1061', repo: { full_name: 'tempoxyz/tempo' } },
+            head: { ref: 'tip/1061', repo: { full_name: 'tempoxyz/tempo' }, sha: 'original-sha' },
           },
         ])
       }

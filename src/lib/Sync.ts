@@ -90,7 +90,7 @@ export type TipRow = {
 }
 
 type CachedPrTips = {
-  updatedAt: string
+  sha: string
   rows: TipRow[]
 }
 
@@ -114,8 +114,8 @@ type PullRequestFile = {
 const mergedCacheBatchSize = 15
 const prCacheTtl = 7 * 24 * 60 * 60
 const prFilesPageSize = 10
-// Bump when PR discovery changes so cached misses are re-evaluated.
-const prCacheVersion = 3
+// Bump when PR discovery or content identity changes so stale entries are re-evaluated.
+const prCacheVersion = 4
 
 function parseTipRow(content: string, filename: string, prJson: string, createdAt: string): TipRow {
   const { number, title } = Tips.parseTitle(content)
@@ -180,8 +180,7 @@ async function fetchPrTips(githubFetch: GithubFetch, kv?: KVNamespace): Promise<
     body: string | null
     html_url: string
     created_at: string
-    updated_at: string
-    head: { ref: string; repo: { full_name: string } | null }
+    head: { ref: string; repo: { full_name: string } | null; sha: string }
   }> = []
   let page = 1
   while (true) {
@@ -206,7 +205,7 @@ async function fetchPrTips(githubFetch: GithubFetch, kv?: KVNamespace): Promise<
     try {
       const cacheKey = `tips:pr:v${prCacheVersion}:${pr.number}`
       const cached = await kv?.get<CachedPrTips>(cacheKey, 'json')
-      if (cached?.updatedAt === pr.updated_at) {
+      if (cached?.sha === pr.head.sha) {
         results.push(...cached.rows)
         continue
       }
@@ -216,7 +215,8 @@ async function fetchPrTips(githubFetch: GithubFetch, kv?: KVNamespace): Promise<
       const headRepo = pr.head.repo?.full_name ?? 'tempoxyz/tempo'
       const rows: TipRow[] = []
       for (const tipFile of tipFiles) {
-        const content = await raw(headRepo, pr.head.ref, tipFile.filename, githubFetch)
+        // Branch URLs can serve an older revision from GitHub's raw-content cache.
+        const content = await raw(headRepo, pr.head.sha, tipFile.filename, githubFetch)
         rows.push(
           parseTipRow(
             content,
@@ -231,7 +231,7 @@ async function fetchPrTips(githubFetch: GithubFetch, kv?: KVNamespace): Promise<
         )
       }
       results.push(...rows)
-      await kv?.put(cacheKey, JSON.stringify({ updatedAt: pr.updated_at, rows }), {
+      await kv?.put(cacheKey, JSON.stringify({ sha: pr.head.sha, rows }), {
         expirationTtl: prCacheTtl,
       })
     } catch (e) {
