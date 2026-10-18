@@ -18,3 +18,4 @@ todos.json
 .env
 public/robots.txt
 worker-configuration.d.ts
+.artifacts

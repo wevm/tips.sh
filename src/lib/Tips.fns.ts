@@ -4,6 +4,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type { Summary, Detail } from './Tips'
 import * as Markdown from './Markdown'
+import * as TipStore from './TipStore'
 
 async function db() {
   const { env } = await import('cloudflare:workers')
@@ -23,20 +24,8 @@ async function sha256(content: string): Promise<string> {
 
 /** List all TIPs ordered by number. */
 export const list = createServerFn().handler(async () => {
-  const rows = await (
-    await db()
-  )
-    .prepare(
-      `SELECT number, title, status, filename, pr_json FROM tips ORDER BY CASE WHEN number GLOB '[0-9]*' THEN 0 ELSE 1 END, CAST(number AS INTEGER)`,
-    )
-    .all<{
-      number: string
-      title: string
-      status: string
-      filename: string
-      pr_json: string
-    }>()
-  return rows.results.map(
+  const rows = await TipStore.list(await db())
+  return rows.map(
     (r) =>
       ({
         number: r.number,
@@ -52,25 +41,7 @@ export const list = createServerFn().handler(async () => {
 export const get = createServerFn({ method: 'POST' })
   .inputValidator(z.string())
   .handler(async ({ data: tipId }) => {
-    const row = await (
-      await db()
-    )
-      .prepare(
-        'SELECT number, title, authors, status, abstract, content, filename, protocol_version, pr_json, created_at FROM tips WHERE number = ?',
-      )
-      .bind(tipId)
-      .first<{
-        number: string
-        title: string
-        authors: string
-        status: string
-        abstract: string
-        content: string
-        filename: string
-        protocol_version: string
-        pr_json: string
-        created_at: string
-      }>()
+    const row = await TipStore.get(await db(), tipId)
     if (!row) throw new Error(`TIP ${tipId} not found`)
 
     const contentHash = await sha256(row.content)

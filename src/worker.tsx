@@ -2,6 +2,7 @@ import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/
 import { ImageResponse } from 'takumi-js/response'
 import wasmModule, { initSync, Renderer } from 'takumi-js/wasm'
 import * as Config from './lib/Config'
+import { vary } from './lib/MarkdownHttp'
 import { OgCard, OgIndex } from './lib/Og'
 // @ts-expect-error bytes import
 import cmunrmData from '../public/fonts/cmunrm-clean.ttf?bytes'
@@ -64,7 +65,9 @@ export default {
     }
 
     if (url.pathname === '/sitemap.xml' && request.method === 'GET') {
-      const rows = await env.DB.prepare("SELECT number FROM tips WHERE pr_json = '' OR pr_json IS NULL").all<{
+      const rows = await env.DB.prepare(
+        "SELECT number FROM tips WHERE pr_json = '' OR pr_json IS NULL",
+      ).all<{
         number: string
       }>()
       const urls = rows.results
@@ -84,10 +87,20 @@ export default {
     }
 
     const response = await handler(request)
-    if (request.method === 'GET' && response.status === 200) {
+    if ((request.method === 'GET' || request.method === 'HEAD') && response.status === 200) {
       const headers = new Headers(response.headers)
-      headers.set('Cache-Control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400')
-      return new Response(response.body, { status: response.status, headers })
+      if (!headers.has('Cache-Control'))
+        headers.set(
+          'Cache-Control',
+          'public, max-age=0, s-maxage=300, stale-while-revalidate=86400',
+        )
+      const result = new Response(response.body, { status: response.status, headers })
+      const type = headers.get('Content-Type') ?? ''
+      const negotiated =
+        !url.pathname.endsWith('.md') &&
+        url.pathname !== '/llms.txt' &&
+        (type.includes('text/html') || type.includes('text/markdown'))
+      return negotiated ? vary(result) : result
     }
     return response
   },
