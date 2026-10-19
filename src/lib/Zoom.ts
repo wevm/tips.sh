@@ -18,7 +18,6 @@ export function openZoom(content: ZoomContent) {
 
   const svgEl = inner.querySelector('svg')
   if (svgEl) {
-    svgEl.removeAttribute('style')
     svgEl.removeAttribute('width')
     svgEl.removeAttribute('height')
     svgEl.style.width = '90vw'
