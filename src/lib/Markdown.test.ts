@@ -54,4 +54,17 @@ describe('render', () => {
     expect(html).toContain('<annotation encoding="application/x-tex">10^{10}</annotation>')
     expect(html).toContain('<annotation encoding="application/x-tex">10^{-18}</annotation>')
   })
+
+  it('compiles mermaid fences to inline SVG', async () => {
+    const html = await render('```mermaid\nflowchart LR\n  A --> B\n```')
+
+    expect(html).toContain('<div class="mermaid-rendered" title="Click to expand"><svg')
+    expect(html).toContain('ondine-flowchart')
+  })
+
+  it('keeps the source of invalid mermaid fences', async () => {
+    const html = await render('```mermaid\nflowchart LR\n  A -->\n```')
+
+    expect(html).toContain('<pre class="mermaid mermaid-error">flowchart LR\n  A -->\n</pre>')
+  })
 })

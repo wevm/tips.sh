@@ -504,6 +504,11 @@ figcaption {
   background: var(--color-code-bg);
 }
 
+.ondine {
+  --ondine-bg: var(--color-bg);
+  --ondine-fg: var(--color-text);
+}
+
 .tip-body .mermaid-rendered svg {
   max-width: 100%;
   height: auto;

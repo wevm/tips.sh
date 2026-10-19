@@ -10,7 +10,13 @@ import rehypeRaw from 'rehype-raw'
 import rehypeStringify from 'rehype-stringify'
 import { createHighlighter, type Highlighter } from 'shiki'
 import { createJavaScriptRegexEngine } from '@shikijs/engine-javascript'
-import type { Element, Text } from 'hast'
+import type { Element, ElementContent, Text } from 'hast'
+import { create, RenderError } from 'ondine/compiler/wasm'
+// @ts-expect-error wasm import
+import all from 'ondine/compiler/wasm/all.wasm'
+
+// Workers reject runtime WebAssembly compilation, so the module is precompiled by the bundler.
+const ondine = create({ modules: { all } })
 
 let highlighterPromise: Promise<Highlighter> | null = null
 function getHighlighter() {
@@ -40,6 +46,7 @@ function rehypeShiki() {
     const highlighter = await getHighlighter()
     const { visit } = await import('unist-util-visit')
 
+    let diagrams = 0
     visit(tree, 'element', (node: Element, index, parent) => {
       if (
         node.tagName !== 'pre' ||
@@ -57,12 +64,7 @@ function rehypeShiki() {
 
       if (lang.toLowerCase() === 'mermaid') {
         if (parent && typeof index === 'number') {
-          ;(parent.children as unknown[])[index] = {
-            type: 'element',
-            tagName: 'pre',
-            properties: { className: ['mermaid'] },
-            children: [{ type: 'text', value: code }],
-          }
+          ;(parent.children as unknown[])[index] = renderMermaid(code, `mermaid-${++diagrams}-`)
         }
         return
       }
@@ -95,6 +97,28 @@ function rehypeTipLinks() {
         '/$1',
       )
     })
+  }
+}
+
+function renderMermaid(
+  source: string,
+  idPrefix: string,
+): ElementContent | { type: 'raw'; value: string } {
+  try {
+    const { svg } = ondine.render(source, { idPrefix })
+    return {
+      type: 'raw',
+      value: `<div class="mermaid-rendered" title="Click to expand">${svg}</div>`,
+    }
+  } catch (error) {
+    if (!(error instanceof RenderError)) throw error
+    console.warn('[mermaid] render failed:', error.message)
+    return {
+      type: 'element',
+      tagName: 'pre',
+      properties: { className: ['mermaid', 'mermaid-error'] },
+      children: [{ type: 'text', value: source }],
+    }
   }
 }
 
