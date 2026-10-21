@@ -1,6 +1,7 @@
 /** Standalone sync script — run with: npx tsx scripts/sync.ts */
 
 import * as Sync from '../src/lib/Sync'
+import * as MarkdownExport from '../src/lib/MarkdownExport'
 
 async function main() {
   const token = process.env.GITHUB_TOKEN
@@ -49,6 +50,16 @@ async function main() {
     cwd: process.cwd(),
     stdio: 'inherit',
   })
+
+  // Keep the expected hashes outside the deployment: a stale remote manifest
+  // must not be able to validate a stale deployment.
+  const { mkdirSync } = await import('fs')
+  mkdirSync('.artifacts', { recursive: true })
+  const inventory = allTips.map((tip) => ({ ...tip, pr_json: tip.prJson }))
+  writeFileSync(
+    '.artifacts/markdown-manifest.json',
+    JSON.stringify(await MarkdownExport.manifest(inventory), null, 2),
+  )
 
   console.log('\n✅ Sync complete!')
 }

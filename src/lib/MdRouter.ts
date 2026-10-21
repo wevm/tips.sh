@@ -2,65 +2,7 @@
 
 import { createMiddleware } from '@tanstack/react-start'
 import * as Markdown from '#/lib/Markdown'
-
-const aiUserAgents = [
-  'GPTBot',
-  'OAI-SearchBot',
-  'ChatGPT-User',
-  'ChatGPT-User/2.0',
-  'anthropic-ai',
-  'ClaudeBot',
-  'claude-web',
-  'PerplexityBot',
-  'Perplexity-User',
-  'Google-Extended',
-  'FacebookBot',
-  'meta-externalagent',
-  'Bytespider',
-  'cohere-ai',
-  'AI2Bot',
-  'CCBot',
-  'Diffbot',
-  'omgili',
-  'Timpibot',
-  'MistralAI-User',
-  'GoogleAgent-Mariner',
-]
-const searchEngineUserAgents = [
-  'Googlebot',
-  'Bingbot',
-  'Amazonbot',
-  'Applebot',
-  'Applebot-Extended',
-  'DuckAssistBot',
-  'YouBot',
-]
-const terminalUserAgents = ['curl/', 'Wget/', 'HTTPie/', 'httpie-go/', 'xh/']
-const ogBotUserAgents = [
-  'Discordbot',
-  'Embedly',
-  'Facebot',
-  'Iframely',
-  'LinkedInBot',
-  'Pinterestbot',
-  'Slackbot',
-  'Slurp',
-  'TelegramBot',
-  'Twitterbot',
-  'WhatsApp',
-  'facebookexternalhit',
-]
-
-function shouldServeMarkdown(request: Request): boolean {
-  const ua = request.headers.get('user-agent') ?? ''
-  const accept = request.headers.get('accept') ?? ''
-  if (ogBotUserAgents.some((a) => ua.includes(a))) return false
-  if (searchEngineUserAgents.some((a) => ua.includes(a))) return false
-  if (aiUserAgents.some((a) => ua.includes(a))) return true
-  if (terminalUserAgents.some((a) => ua.includes(a))) return true
-  if (accept.includes('text/markdown')) return true
-  return false
-}
+import * as MarkdownHttp from '#/lib/MarkdownHttp'
 
 export const middleware = createMiddleware({ type: 'request' }).server(
   async ({ request, next }) => {
@@ -69,7 +11,7 @@ export const middleware = createMiddleware({ type: 'request' }).server(
 
     const tipFile = pathname.match(/^\/tip-(\d+)\.md$/)
     if (tipFile) {
-      url.pathname = `/${tipFile[1]}`
+      url.pathname = `/${tipFile[1]}.md`
       throw Response.redirect(url.toString(), 308)
     }
 
@@ -123,62 +65,11 @@ export const middleware = createMiddleware({ type: 'request' }).server(
       }
     }
 
-    // /:id.md → always serve markdown regardless of user-agent
-    const mdMatch = pathname.match(/^\/(\d+)\.md$/)
-    if (mdMatch) {
-      try {
-        const { env } = await import('cloudflare:workers')
-        const tip = await env.DB.prepare('SELECT content FROM tips WHERE number = ?')
-          .bind(mdMatch[1])
-          .first<{ content: string }>()
-        if (tip)
-          throw new Response(tip.content, {
-            headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
-          })
-      } catch (e) {
-        if (e instanceof Response) throw e
-        console.error('[md-router]', e)
-      }
-      return next()
-    }
-
-    if (!shouldServeMarkdown(request)) return next()
-
-    try {
+    const markdown = await MarkdownHttp.handle(request, async () => {
       const { env } = await import('cloudflare:workers')
-      const db = env.DB
-
-      const tipMatch = pathname.match(/^\/(\d+)$/)
-      if (tipMatch) {
-        const tip = await db
-          .prepare('SELECT content FROM tips WHERE number = ?')
-          .bind(tipMatch[1])
-          .first<{ content: string }>()
-        if (tip)
-          throw new Response(tip.content, {
-            headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
-          })
-      }
-
-      if (pathname === '/') {
-        const rows = await db
-          .prepare('SELECT number, title, status FROM tips ORDER BY CAST(number AS INTEGER)')
-          .all<{ number: string; title: string; status: string }>()
-        if (rows.results.length > 0) {
-          const lines = [
-            '# Tempo Improvement Proposals\n',
-            ...rows.results.map((t) => `- **TIP-${t.number}**: ${t.title} (${t.status})`),
-          ]
-          throw new Response(lines.join('\n'), {
-            headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
-          })
-        }
-      }
-    } catch (e) {
-      if (e instanceof Response) throw e
-      console.error('[md-router]', e)
-    }
-
+      return env.DB
+    })
+    if (markdown) throw markdown
     return next()
   },
 )

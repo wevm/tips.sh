@@ -1,5 +1,6 @@
 name: Main
 on:
+  pull_request:
   push:
     branches: [main]
 jobs:
@@ -18,7 +19,11 @@ jobs:
       - name: Typecheck
         run: pnpm check:types
 
+      - name: Test
+        run: pnpm test
+
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: check
     runs-on: ubuntu-latest
     steps:
@@ -51,3 +56,6 @@ jobs:
         with:
           command: deploy
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Verify deployed Markdown
+        run: pnpm check:markdown --url https://tips.sh --manifest .artifacts/markdown-manifest.json
