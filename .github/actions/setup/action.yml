@@ -4,7 +4,7 @@ runs:
   using: composite
   steps:
     - name: Install pnpm
-      uses: pnpm/action-setup@v4
+      uses: wevm/actions/vendor/pnpm/action-setup/v6@73e899a58d51092d694fbaf94b7a1d8c09bfea28
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
