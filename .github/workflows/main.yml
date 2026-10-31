@@ -36,13 +36,13 @@ jobs:
 
       - name: Mint deployment token
         id: cloudflare
-        uses: wevm/actions/.github/actions/cloudflare-sts@f681dd57021d3617312d8dd42bd2806076de77cc
+        uses: wevm/actions/.github/actions/cloudflare-sts@8963daf30237417f873c8e2f17e3bf9415e3a7b9
         with:
           policy: deploy-production
           ttl: 15m
 
       - name: Migrate D1
-        uses: wevm/actions/vendor/cloudflare/wrangler-action/rev-9acf94ace14e@73e899a58d51092d694fbaf94b7a1d8c09bfea28
+        uses: wevm/actions/vendor/cloudflare/wrangler-action/rev-9acf94ace14e@8963daf30237417f873c8e2f17e3bf9415e3a7b9
         with:
           command: d1 migrations apply tips --remote
           accountId: ${{ steps.cloudflare.outputs.account-id }}
@@ -62,7 +62,7 @@ jobs:
           VITE_BASE_URL: https://tips.sh
 
       - name: Deploy
-        uses: wevm/actions/vendor/cloudflare/wrangler-action/rev-9acf94ace14e@73e899a58d51092d694fbaf94b7a1d8c09bfea28
+        uses: wevm/actions/vendor/cloudflare/wrangler-action/rev-9acf94ace14e@8963daf30237417f873c8e2f17e3bf9415e3a7b9
         with:
           command: deploy
           accountId: ${{ steps.cloudflare.outputs.account-id }}
