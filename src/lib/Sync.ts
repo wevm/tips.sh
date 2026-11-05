@@ -288,14 +288,15 @@ export async function fetchAllTips(
     )
   }
 
-  const prTips = await fetchPrTips(githubFetch, kv)
+  // A merged TIP shows only its version on main: open PRs that edit it (or reuse
+  // its number) are not separate entries.
+  const mergedNumbers = new Set(mergedDetails.map((d) => d.number))
+  const prTips = (await fetchPrTips(githubFetch, kv)).filter((d) => !mergedNumbers.has(d.number))
 
-  // Count how many times each number appears across merged + PR TIPs
+  // Count how many open PRs propose each unmerged number
   const countByNumber = new Map<string, number>()
-  for (const d of mergedDetails) countByNumber.set(d.number, (countByNumber.get(d.number) ?? 0) + 1)
   for (const d of prTips) countByNumber.set(d.number, (countByNumber.get(d.number) ?? 0) + 1)
 
-  const mergedNumbers = new Set(mergedDetails.map((d) => d.number))
   const oldestPrByNumber = new Map<string, number>()
   for (const d of prTips) {
     const prNumber = (JSON.parse(d.prJson) as { number: number }).number
@@ -309,7 +310,7 @@ export async function fetchAllTips(
     const total = countByNumber.get(d.number) ?? 1
     if (total <= 1) return d
     const prNumber = (JSON.parse(d.prJson) as { number: number }).number
-    if (!mergedNumbers.has(d.number) && prNumber === oldestPrByNumber.get(d.number)) return d
+    if (prNumber === oldestPrByNumber.get(d.number)) return d
     const idx = (seenByBase.get(d.number) ?? 0) + 1
     seenByBase.set(d.number, idx)
     return { ...d, number: `${d.number}-${idx}` }

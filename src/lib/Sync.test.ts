@@ -428,4 +428,63 @@ describe('fetchAllTips', () => {
       globalThis.fetch = originalFetch
     }
   })
+
+  it('shows only the merged version of a TIP that open PRs edit', async () => {
+    const originalFetch = globalThis.fetch
+
+    globalThis.fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+
+      if (url.includes('/git/trees/main?recursive=1')) {
+        return json({ tree: [{ path: 'tips/tip-1000.md', type: 'blob', sha: 'merged-sha' }] })
+      }
+      if (url.includes('/commits?'))
+        return json([{ commit: { committer: { date: '2026-01-01T00:00:00Z' } } }])
+      if (url.includes('/pulls?')) {
+        return json([
+          {
+            number: 8777,
+            title: 'docs(tips): update statuses',
+            body: null,
+            html_url: 'https://github.com/tempoxyz/tempo/pull/8777',
+            created_at: '2026-10-01T00:00:00Z',
+            head: { ref: 'tip-statuses', repo: { full_name: 'tempoxyz/tempo' }, sha: 'edit-sha' },
+          },
+          {
+            number: 8800,
+            title: 'docs(tip-1001): new proposal',
+            body: null,
+            html_url: 'https://github.com/tempoxyz/tempo/pull/8800',
+            created_at: '2026-10-02T00:00:00Z',
+            head: { ref: 'tip/1001', repo: { full_name: 'tempoxyz/tempo' }, sha: 'new-sha' },
+          },
+        ])
+      }
+      if (url.includes('/pulls/8777/files?'))
+        return json([{ filename: 'tips/tip-1000.md', status: 'modified' }])
+      if (url.includes('/pulls/8800/files?'))
+        return json([{ filename: 'tips/tip-1001.md', status: 'added' }])
+      if (url.includes('/edit-sha/'))
+        return new Response(mergedTip.replace('Merged TIP', 'Edited TIP'))
+      if (url.includes('/new-sha/')) return new Response(proposedTip)
+      if (url.startsWith('https://raw.githubusercontent.com/')) return new Response(mergedTip)
+      throw new Error(`Unexpected request: ${url}`)
+    }
+
+    try {
+      const tips = await fetchAllTips()
+      expect(
+        tips.map((tip) => [
+          tip.number,
+          tip.title,
+          tip.prJson ? JSON.parse(tip.prJson).number : null,
+        ]),
+      ).toEqual([
+        ['1000', 'Merged TIP', null],
+        ['1001', 'Proposed TIP', 8800],
+      ])
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
 })
